@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - rdkit
   - defaults
+  - "openbiosim/label/dev"
 dependencies:
   - python=3.10
   - toml>=0.10.2
@@ -22,6 +23,7 @@ dependencies:
   - openbabel>=3.1.1
   - pandas>=2.0.0
   - pip>=20.0
+  - biosimspace
   - pip:
     - meeko==0.4.0
     - git+https://github.com/ExaWorks/psij-python.git@9e1a777
