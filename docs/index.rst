@@ -57,7 +57,7 @@ Each step documentation will contain information on how to setup and run the nod
 
 * With a separate python environment:
 
-  Some nodes will require custom python environments that are likely to be incompatible with the other environments. In those cases, the node process can be spawned in a custom environment. Note that this environment must still contain *maize*. Required custom environments can be found in the appropriate node directory.
+  Some nodes will require custom python environments that are likely to be incompatible with the other environments. In those cases, the node process can be spawned in a custom environment. Note that this environment must still contain *maize*.
 
 * By specifying the executable location and possibly script interpreter. This can also be accomplished using ``config.toml`` (see `Configuring workflows <https://molecularai.github.io/maize/docs/userguide.html#config-workflow>`_).
 
