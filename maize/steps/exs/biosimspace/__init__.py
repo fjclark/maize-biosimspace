@@ -1,6 +1,6 @@
 """
 biosimspace
-^^^^^^^^^
+^^^^^^^^^^^
 
 This python package provides Nodes for BioSimSpace (https://biosimspace.openbiosim.org). With 
 BioSimSpace is a python framework for engine-agnostic simulation workflows. Nodes are implemented

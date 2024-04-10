@@ -6,13 +6,7 @@ __pycache__
 .vscode
 .pylintrc
 .*_cache
-*_autosummary
 coverage
-docs/_build
-docs/_static
-docs/autosummary
-docs/Makefile
-docs/make.bat
 /test-config.toml
 test
 testing.ipynb
