@@ -19,6 +19,7 @@ dependencies:
   - mypy>=1.2.0, <1.7
   - pylint>=2.17.3
   - sphinx>=6.2.0
+  - nbsphinx
   - pandoc>=3.1.1
   - graphviz>=8.0.3
   - beartype>=0.13.1
