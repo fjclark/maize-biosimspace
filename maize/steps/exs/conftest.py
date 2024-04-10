@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Any
+
 import pytest
 
 from maize.utilities.io import Config
@@ -53,3 +54,13 @@ def example_smiles() -> list[str]:
         "CC(C)NCCCn(c(c12)nc(F)nc2N)c(n1)Cc(c3)c(I)cc(c34)OCO4",
         "O1COc(c12)cc(Br)c(c2)Cc(nc(n34)c(N)ncc3)c4NCc5ccccc5",
     ]
+
+
+@pytest.fixture
+def complex_prm7_path(shared_datadir: Any) -> Any:
+    return shared_datadir / "complex.prm7"
+
+
+@pytest.fixture
+def complex_rst7_path(shared_datadir: Any) -> Any:
+    return shared_datadir / "complex.rst7"

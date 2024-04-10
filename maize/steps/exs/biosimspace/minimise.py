@@ -144,16 +144,6 @@ for engine in BSSEngine:
     )
 
 
-@pytest.fixture
-def complex_prm7_path(shared_datadir: Any) -> Any:
-    return shared_datadir / "complex.prm7"
-
-
-@pytest.fixture
-def complex_rst7_path(shared_datadir: Any) -> Any:
-    return shared_datadir / "complex.rst7"
-
-
 class TestSuiteMinimise:
     # Parameterise, but skip OpenMM as this is failing
     @pytest.mark.parametrize("engine", BSSEngine)
