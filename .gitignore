@@ -9,5 +9,6 @@ __pycache__
 coverage
 /test-config.toml
 test
+_build
 testing.ipynb
 deplicenses.txt
