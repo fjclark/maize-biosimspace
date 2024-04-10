@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maize-biosimspace"
+description = "Custom maize nodes and subgraphs"
+version = "0.1.0"
+authors = [{name = "Finlay CLark"}]
+maintainers = [{name = "Finlay Clark", email = "finlay.clark@ed.ac.uk"}]
+requires-python = ">=3.10"
+dependencies = [
+    "maize>=0.6.0",
+    "rdkit>=2022.9.5",
+    "pandas>=2.0.0",
+    "biosimspace"
+]
+
+
+# Not quite sure why this is required (rather than listing the packages explicitly),
+# but without this will only install using --editable, see also:
+# https://stackoverflow.com/questions/43430852/import-only-works-when-module-installed-using-editable-pip-flag
+[tool.setuptools.packages.find]
+include = ["maize*"]
+
+[tool.pytest.ini_options]
+config = "test-config.toml"
+log_cli = true
+log_cli_level = "DEBUG"
+addopts = ["-vv"]
+python_files = ["*.py"]
+python_classes = ["TestSuite*"]
+testpaths = [
+    "maize/steps",
+    "tests",
+]
+
+[tool.mypy]
+follow_imports = "silent"
+ignore_missing_imports = true
+strict = true
+explicit_package_bases = true
+namespace_packages = true
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
