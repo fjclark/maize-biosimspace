@@ -8,7 +8,7 @@ __pycache__
 .*_cache
 coverage
 /test-config.toml
-test
 _build
+test
 testing.ipynb
 deplicenses.txt
