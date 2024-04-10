@@ -1,4 +1,4 @@
-# maize-biosimsace
+# maize-biosimspace
 
 This is a [*namespace package*](https://packaging.python.org/en/latest/guides/packaging-namespace-packages/) for [BioSimSpace](https://biosimspace.openbiosim.org/) nodes and subgraphs for [maize](https://github.com/MolecularAI/maize).
 
