@@ -14,11 +14,10 @@ class BSSEngine(StrEnum):
     SANDER = auto()
     PMEMD = auto()
     PMEMD_CUDA = auto()
-    # OPENMM = auto()
+    OPENMM = auto()
     SOMD = auto()
-    # NAMD = auto()
+    NAMD = auto()
     TLEAP = auto()
-    NONE = auto()
 
     @property
     def class_name(self) -> str:
@@ -31,11 +30,10 @@ _ENGINE_CALLABLES = {
     BSSEngine.SANDER: ["sander"],
     BSSEngine.PMEMD: ["pmemd"],
     BSSEngine.PMEMD_CUDA: ["pmemd.cuda"],
-    # BSSEngine.OPENMM: ["sire_python"],
+    BSSEngine.OPENMM: ["sire_python"],
     BSSEngine.SOMD: ["somd"],
-    # BSSEngine.NAMD: ["namd"],
+    BSSEngine.NAMD: ["namd"],
     BSSEngine.TLEAP: ["tleap"],
-    BSSEngine.NONE: [],
 }
 """A mapping between the BioSimSpace engine and the required callables for each engine."""
 

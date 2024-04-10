@@ -30,8 +30,8 @@ class _ClassProperty:
 
 def create_engine_specific_nodes(
     abstract_base_node: Node,
-    module_name: str,
-    exclude_engines: list[BSSEngine] = [BSSEngine.TLEAP, BSSEngine.NONE],
+    module: str,
+    engines: list[BSSEngine] = [Engine for Engine in BSSEngine],
 ) -> None:
     """
     Create engine-specific nodes for BioSimSpace from an abstract base node.
@@ -41,20 +41,17 @@ def create_engine_specific_nodes(
     ----------
     abstract_base_node : Node
         The abstract base node from which to create the engine-specific nodes.
-    module_name : str
-        The name of the module where the new classes should be added.
-    exclude_engines : list[BSSEngine], optional
-        A list of engines to exclude from the creation of the nodes, by default [BSSEngine.TLEAP, BSSEngine.NONE]
+    module : str
+        The module to create the nodes in.
+    engines : list[BSSEngine], optional
+        The engines to create nodes for, by default all engines defined in the BSSEngine Enum.
     """
-    module_dict = sys.modules[module_name].__dict__
+    module_dict = sys.modules[module].__dict__
 
-    for engine in BSSEngine:
-        if engine in exclude_engines:
-            continue
+    for engine in engines:
         protocol_name = abstract_base_node.__name__.split("Base")[0][1:]
         doctring_desc = protocol_name if protocol_name != "Production" else "Run production MD on"
         class_name = f"{protocol_name}{engine.class_name}"
-        print(f"Creating {class_name} node.")
         docstring = f"""
         {doctring_desc} the system using {engine.name.capitalize()} through BioSimSpace.
 

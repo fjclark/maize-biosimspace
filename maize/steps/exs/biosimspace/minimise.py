@@ -2,7 +2,6 @@
 
 # pylint: disable=import-outside-toplevel, import-error
 
-import shutil
 from abc import ABC
 from typing import Any
 
@@ -13,10 +12,16 @@ from maize.utilities.testing import TestRig
 
 from ._base import _BioSimSpaceBase
 from ._utils import create_engine_specific_nodes
-from .enums import _ENGINE_CALLABLES, BSSEngine
-from .exceptions import BioSimSpaceNullSystemError
+from .enums import BSSEngine
 
-# __all__ = [f"Minimise{engine.class_name}" for engine in BSSEngine]
+_ENGINES = [
+    Engine
+    for Engine in BSSEngine
+    if Engine not in [BSSEngine.OPENMM, BSSEngine.TLEAP, BSSEngine.NAMD]
+]
+"""The supported engines for minimisation"""
+
+__all__ = [f"Minimise{engine.class_name}" for engine in _ENGINES]
 
 
 class _MinimiseBase(_BioSimSpaceBase, ABC):
@@ -76,15 +81,12 @@ class _MinimiseBase(_BioSimSpaceBase, ABC):
         )
 
 
-create_engine_specific_nodes(_MinimiseBase, __name__)
+create_engine_specific_nodes(_MinimiseBase, __name__, _ENGINES)
 
 
 class TestSuiteMinimise:
     # Parameterise, but skip OpenMM as this is failing
-    @pytest.mark.parametrize(
-        "engine",
-        [Engine for Engine in BSSEngine if Engine not in [BSSEngine.TLEAP, BSSEngine.NONE]],
-    )
+    @pytest.mark.parametrize("engine", _ENGINES)
     def test_biosimspace_minimise(
         self,
         temp_working_dir: Any,
@@ -94,7 +96,7 @@ class TestSuiteMinimise:
     ) -> None:
         """Test the BioSimSpace minimisation node."""
 
-        rig = TestRig(globals()[f"Minimise{engine.class_name}"])
+        rig = TestRig(globals()[f"Equilibrate{engine.class_name}"])
         res = rig.setup_run(
             inputs={"inp": [[complex_prm7_path, complex_rst7_path]]},
             parameters={"steps": 10},

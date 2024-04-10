@@ -2,7 +2,6 @@
 
 # pylint: disable=import-outside-toplevel, import-error
 
-import shutil
 from abc import ABC
 from typing import Any
 
@@ -12,11 +11,17 @@ from maize.core.interface import Parameter
 from maize.utilities.testing import TestRig
 
 from ._base import _BioSimSpaceBase
-from ._utils import _ClassProperty
-from .enums import _ENGINE_CALLABLES, BSSEngine, Ensemble
-from .exceptions import BioSimSpaceNullSystemError
+from ._utils import create_engine_specific_nodes
+from .enums import BSSEngine, Ensemble
 
-__all__ = [f"Equilibrate{engine.class_name}" for engine in BSSEngine]
+_ENGINES = [
+    Engine
+    for Engine in BSSEngine
+    if Engine not in [BSSEngine.OPENMM, BSSEngine.TLEAP, BSSEngine.NAMD]
+]
+"""The supported engines for equilibration."""
+
+__all__ = [f"Equilibrate{engine.class_name}" for engine in _ENGINES]
 
 
 class _EquilibrateBase(_BioSimSpaceBase, ABC):
@@ -34,13 +39,6 @@ class _EquilibrateBase(_BioSimSpaceBase, ABC):
     L. O. Hedges et al., JOSS, 2019, 4, 1831.
     L. O. Hedges et al., LiveCoMS, 2023, 5, 2375–2375.
     """
-
-    bss_engine: BSSEngine
-    """The engine to use in the subclass."""
-
-    @_ClassProperty
-    def required_callables(cls) -> list[str]:
-        return _ENGINE_CALLABLES[cls.bss_engine]
 
     # Parameters
     timestep: Parameter[float] = Parameter(default=2.0)
@@ -99,30 +97,18 @@ class _EquilibrateBase(_BioSimSpaceBase, ABC):
     """
 
     def run(self) -> None:
+        self._run_process()
+
+    def _get_protocol(self) -> "BSS.Protocol._protocol.Protocol":
         import BioSimSpace as BSS
 
-        # Map the BSS Engines to process classes
-        process_map = {
-            BSSEngine.GROMACS: BSS.Process.Gromacs,
-            BSSEngine.SANDER: BSS.Process.Amber,
-            BSSEngine.PMEMD: BSS.Process.Amber,
-            BSSEngine.PMEMD_CUDA: BSS.Process.Amber,
-            # BSSEngine.OPENMM: BSS.Process.OpenMM,
-            BSSEngine.SOMD: BSS.Process.Somd,
-            # BSSEngine.NAMD: BSS.Process.Namd,
-        }
-
-        # Get the input
-        system = self._load_input()
-
-        # Create the protocol
         pressure = (
             None
             if self.ensemble.value == Ensemble.NVT
             else self.pressure.value * BSS.Units.Pressure.atm
         )
 
-        protocol = BSS.Protocol.Equilibration(
+        return BSS.Protocol.Equilibration(
             timestep=self.timestep.value * BSS.Units.Time.femtosecond,
             runtime=self.runtime.value * BSS.Units.Time.nanosecond,
             temperature_start=self.temperature_start.value * BSS.Units.Temperature.kelvin,
@@ -136,59 +122,12 @@ class _EquilibrateBase(_BioSimSpaceBase, ABC):
             force_constant=self.force_constant.value,
         )
 
-        # Get the process
-        process = process_map[self.bss_engine](
-            system,
-            protocol=protocol,
-            exe=self._get_executable(),
-            work_dir=str(self.work_dir),
-        )
 
-        # Run the process and wait for it to finish
-        self.logger.info(
-            f"Equilibrating system with {self.bss_engine} for {self.runtime.value} ns..."
-        )
-        process.start()
-        equilibrated_system = process.getSystem(block=True)
-        # BioSimSpace sometimes returns None, so we need to check
-        if equilibrated_system is None:
-            raise BioSimSpaceNullSystemError("The minimised system is None.")
-
-        # Save the output
-        self._save_output(equilibrated_system)
-
-    def _get_executable(self) -> str:
-        """Get the full path to the executable."""
-        if self.required_callables:
-            return shutil.which(self.required_callables[0])
-        return None
-
-
-# Programmatically derive the Minimise classes, ensuring that we include custom docstrings
-for engine in BSSEngine:
-    docstring = f"""
-    Equilibrate the system using {engine.name.capitalize()} through BioSimSpace.
-
-    Notes
-    -----
-    Install with `mamba create -f env.yaml`.
-
-    References
-    ----------
-    L. O. Hedges et al., JOSS, 2019, 4, 1831.
-    L. O. Hedges et al., LiveCoMS, 2023, 5, 2375–2375.
-    """
-    # Split the engine name by underscores and capitalise each word
-    class_name = f"Equilibrate{engine.class_name}"
-    globals()[class_name] = type(
-        class_name,
-        (_EquilibrateBase,),
-        {"bss_engine": engine, "__doc__": docstring},
-    )
+create_engine_specific_nodes(_EquilibrateBase, __name__, _ENGINES)
 
 
 class TestSuiteEquilibrate:
-    @pytest.mark.parametrize("engine", BSSEngine)
+    @pytest.mark.parametrize("engine", _ENGINES)
     def test_biosimspace_equilibrate(
         self,
         temp_working_dir: Any,
