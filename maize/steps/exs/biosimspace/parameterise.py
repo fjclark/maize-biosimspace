@@ -10,6 +10,7 @@ from maize.core.interface import Parameter
 from maize.utilities.testing import TestRig
 
 from ._base import _BioSimSpaceBase
+from .enums import BSSEngine
 
 __all__ = ["Parameterise"]
 
@@ -28,8 +29,7 @@ class Parameterise(_BioSimSpaceBase):
     L. O. Hedges et al., LiveCoMS, 2023, 5, 2375–2375.
     """
 
-    required_callables = ["tleap"]
-    """Installed with ambertools - this is a requirement for BioSimSpace"""
+    bss_engine = BSSEngine.TLEAP
 
     # Parameters
     force_field: Parameter[str] = Parameter()

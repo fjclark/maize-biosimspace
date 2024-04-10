@@ -10,6 +10,7 @@ from maize.core.interface import Parameter
 from maize.utilities.testing import TestRig
 
 from ._base import _BioSimSpaceBase
+from .enums import BSSEngine
 
 __all__ = ["Solvate"]
 
@@ -28,8 +29,7 @@ class Solvate(_BioSimSpaceBase):
     L. O. Hedges et al., LiveCoMS, 2023, 5, 2375–2375.
     """
 
-    required_callables = ["gmx"]
-    """BioSimSpace uses gromacs for solvation"""
+    bss_engine = BSSEngine.GROMACS
 
     # Parameters
     water_model: Parameter[str] = Parameter(default="tip3p")
@@ -130,12 +130,12 @@ class Solvate(_BioSimSpaceBase):
 
 
 @pytest.fixture
-def complex_prm7_path(shared_datadir: Any) -> Any:
+def complex_dry_prm7_path(shared_datadir: Any) -> Any:
     return shared_datadir / "complex_dry.prm7"
 
 
 @pytest.fixture
-def complex_rst7_path(shared_datadir: Any) -> Any:
+def complex_dry_rst7_path(shared_datadir: Any) -> Any:
     return shared_datadir / "complex_dry.rst7"
 
 
@@ -143,8 +143,8 @@ class TestSuiteSolvate:
     def test_biosimspace_solvation(
         self,
         temp_working_dir: Any,
-        complex_prm7_path: Any,
-        complex_rst7_path: Any,
+        complex_dry_prm7_path: Any,
+        complex_dry_rst7_path: Any,
     ) -> None:
         """
         Test the BioSimSpace solvation node. Note that the input is already solvated,
@@ -153,7 +153,7 @@ class TestSuiteSolvate:
 
         rig = TestRig(Solvate)
         res = rig.setup_run(
-            inputs={"inp": [[complex_prm7_path, complex_rst7_path]]},
+            inputs={"inp": [[complex_dry_prm7_path, complex_dry_rst7_path]]},
             parameters={"padding": 15.0, "box_type": "cubic"},
         )
         output = res["out"].get()

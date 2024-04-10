@@ -12,11 +12,11 @@ from maize.core.interface import Parameter
 from maize.utilities.testing import TestRig
 
 from ._base import _BioSimSpaceBase
-from ._utils import _ClassProperty
+from ._utils import create_engine_specific_nodes
 from .enums import _ENGINE_CALLABLES, BSSEngine
 from .exceptions import BioSimSpaceNullSystemError
 
-__all__ = [f"Minimise{engine.class_name}" for engine in BSSEngine]
+# __all__ = [f"Minimise{engine.class_name}" for engine in BSSEngine]
 
 
 class _MinimiseBase(_BioSimSpaceBase, ABC):
@@ -34,13 +34,6 @@ class _MinimiseBase(_BioSimSpaceBase, ABC):
     L. O. Hedges et al., JOSS, 2019, 4, 1831.
     L. O. Hedges et al., LiveCoMS, 2023, 5, 2375–2375.
     """
-
-    bss_engine: BSSEngine
-    """The engine to use in the subclass."""
-
-    @_ClassProperty
-    def required_callables(cls) -> list[str]:
-        return _ENGINE_CALLABLES[cls.bss_engine]
 
     # Parameters
     steps: Parameter[int] = Parameter(default=10_000)
@@ -71,82 +64,27 @@ class _MinimiseBase(_BioSimSpaceBase, ABC):
     """
 
     def run(self) -> None:
+        self._run_process()
+
+    def _get_protocol(self) -> "BSS.Protocol._protocol.Protocol":
         import BioSimSpace as BSS
 
-        # Map the BSS Engines to process classes
-        process_map = {
-            BSSEngine.GROMACS: BSS.Process.Gromacs,
-            BSSEngine.SANDER: BSS.Process.Amber,
-            BSSEngine.PMEMD: BSS.Process.Amber,
-            BSSEngine.PMEMD_CUDA: BSS.Process.Amber,
-            # BSSEngine.OPENMM: BSS.Process.OpenMM,
-            BSSEngine.SOMD: BSS.Process.Somd,
-            # BSSEngine.NAMD: BSS.Process.Namd,
-        }
-
-        # Get the input
-        system = self._load_input()
-
-        # Create the protocol
-        protocol = BSS.Protocol.Minimisation(
+        return BSS.Protocol.Minimisation(
             steps=self.steps.value,
             restraint=self.restraint.value if self.restraint.value else None,
             force_constant=self.force_constant.value,
         )
 
-        # Get the process
-        process = process_map[self.bss_engine](
-            system,
-            protocol=protocol,
-            exe=self._get_executable(),
-            work_dir=str(self.work_dir),
-        )
 
-        # Run the process and wait for it to finish
-        self.logger.info(f"Minimising system with {self.bss_engine}...")
-        cmd = " ".join([process.exe(), process.getArgString()])
-        self.run_command(cmd)
-        minimised_system = process.getSystem(block=True)
-        # BioSimSpace sometimes returns None, so we need to check
-        if minimised_system is None:
-            raise BioSimSpaceNullSystemError("The minimised system is None.")
-
-        # Save the output
-        self._save_output(minimised_system)
-
-    def _get_executable(self) -> str:
-        """Get the full path to the executable."""
-        if self.required_callables:
-            return shutil.which(self.required_callables[0])
-        return None
-
-
-# Programmatically derive the Minimise classes, ensuring that we include custom docstrings
-for engine in BSSEngine:
-    docstring = f"""
-    Minimise the system using {engine.name.capitalize()} through BioSimSpace.
-
-    Notes
-    -----
-    Install with `mamba create -f env.yaml`.
-
-    References
-    ----------
-    L. O. Hedges et al., JOSS, 2019, 4, 1831.
-    L. O. Hedges et al., LiveCoMS, 2023, 5, 2375–2375.
-    """
-    # Split the engine name by underscores and capitalise each word
-    class_name = f"Minimise{engine.class_name}"
-    globals()[class_name] = type(
-        class_name,
-        (_MinimiseBase,),
-        {"bss_engine": engine, "__doc__": docstring},
-    )
+create_engine_specific_nodes(_MinimiseBase, __name__)
 
 
 class TestSuiteMinimise:
     # Parameterise, but skip OpenMM as this is failing
-    @pytest.mark.parametrize("engine", BSSEngine)
+    @pytest.mark.parametrize(
+        "engine",
+        [Engine for Engine in BSSEngine if Engine not in [BSSEngine.TLEAP, BSSEngine.NONE]],
+    )
     def test_biosimspace_minimise(
         self,
         temp_working_dir: Any,
