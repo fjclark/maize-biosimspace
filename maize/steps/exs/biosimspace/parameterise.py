@@ -2,6 +2,7 @@
 
 # pylint: disable=import-outside-toplevel, import-error
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -88,6 +89,9 @@ class Parameterise(_BioSimSpaceBase):
         # Save the output
         self._save_output(param_mol)
 
+        # Dump the data
+        self._dump_data()
+
 
 @pytest.fixture
 def protein_pdb_path(shared_datadir: Any) -> Any:
@@ -102,10 +106,18 @@ class TestSuiteParameterise:
     ) -> None:
         """Test the BioSimSpace parameterisation node."""
         rig = TestRig(Parameterise)
+        dump_dir = Path().absolute().parents[1] / "dump"
         res = rig.setup_run(
-            inputs={"inp": [protein_pdb_path]}, parameters={"force_field": "ff14sb"}
+            inputs={"inp": [protein_pdb_path]},
+            parameters={"force_field": "ff14sb", "dump_to": dump_dir},
         )
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
         assert file_names == {"bss_system.gro", "bss_system.top"}
+
+        # Check that the dumping worked
+        # Get the most recent directory in the dump folder
+        dump_output_dir = sorted(dump_dir.iterdir())[-1]
+        assert (dump_output_dir / "bss_system.gro").exists()
+        assert (dump_output_dir / "bss_system.top").exists()

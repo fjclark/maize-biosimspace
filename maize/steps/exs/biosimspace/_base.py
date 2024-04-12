@@ -2,10 +2,11 @@
 
 # pylint: disable=import-outside-toplevel, import-error
 import shutil
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from maize.core.interface import Input, Output
+from maize.core.interface import FileParameter, Input, Output
 from maize.core.node import Node
 
 from ._utils import _ClassProperty
@@ -49,6 +50,10 @@ class _BioSimSpaceBase(Node, ABC):
     
     gro87, grotop, mol2, pdb, pdbx, prm7, rst rst7, psf, sdf
     """
+
+    # Parameters
+    dump_to: FileParameter[Path] = FileParameter(optional=True)
+    """A folder to dump all generated data to"""
 
     # Output
     out: Output[list[Path]] = Output(mode="copy")
@@ -98,9 +103,9 @@ class _BioSimSpaceBase(Node, ABC):
             BSSEngine.SANDER: BSS.Process.Amber,
             BSSEngine.PMEMD: BSS.Process.Amber,
             BSSEngine.PMEMD_CUDA: BSS.Process.Amber,
-            # BSSEngine.OPENMM: BSS.Process.OpenMM,
+            BSSEngine.OPENMM: BSS.Process.OpenMM,
             BSSEngine.SOMD: BSS.Process.Somd,
-            # BSSEngine.NAMD: BSS.Process.Namd,
+            BSSEngine.NAMD: BSS.Process.Namd,
         }
 
         # Get the input
@@ -128,6 +133,25 @@ class _BioSimSpaceBase(Node, ABC):
 
         # Save the output
         self._save_output(output_system)
+
+        # Dump the data
+        self._dump_data()
+
+    def _dump_data(self) -> None:
+        """Dump the data to the dump_to folder."""
+        if self.dump_to.is_set:
+            # Set unqiue name based on object name and time, so that many nodes
+            # can use the same dump directory
+            dump_dir = self.dump_to.value / f"{self.name}_{time.strftime('%Y-%m-%d_%H-%M-%S')}"
+            dump_dir.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"Dumping data to {dump_dir}")
+
+            for file in self.work_dir.iterdir():
+                # Move directories, and copy files
+                if file.is_dir():
+                    shutil.move(file, dump_dir)
+                else:
+                    shutil.copy(file, dump_dir)
 
     def _get_executable(self) -> str:
         """Get the full path to the executable."""

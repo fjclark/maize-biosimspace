@@ -2,6 +2,7 @@
 
 # pylint: disable=import-outside-toplevel, import-error
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -128,6 +129,9 @@ class Solvate(_BioSimSpaceBase):
         # Save the output
         self._save_output(solvated_system)
 
+        # Dump the data
+        self._dump_data()
+
 
 @pytest.fixture
 def complex_dry_prm7_path(shared_datadir: Any) -> Any:
@@ -152,9 +156,10 @@ class TestSuiteSolvate:
         """
 
         rig = TestRig(Solvate)
+        dump_dir = Path().absolute().parents[1] / "dump"
         res = rig.setup_run(
             inputs={"inp": [[complex_dry_prm7_path, complex_dry_rst7_path]]},
-            parameters={"padding": 15.0, "box_type": "cubic"},
+            parameters={"padding": 15.0, "box_type": "cubic", "dump_to": dump_dir},
         )
         output = res["out"].get()
         # Get the file name from the path
@@ -166,3 +171,9 @@ class TestSuiteSolvate:
             lines = f.readlines()
             box_size = [float(x) for x in lines[-1].split()]
             assert box_size == [7.239, 7.239, 7.239]
+
+        # Check that the dumping worked
+        # Get the most recent directory in the dump folder
+        dump_output_dir = sorted(dump_dir.iterdir())[-1]
+        assert (dump_output_dir / "bss_system.gro").exists()
+        assert (dump_output_dir / "bss_system.top").exists()

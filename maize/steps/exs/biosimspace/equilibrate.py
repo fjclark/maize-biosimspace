@@ -3,6 +3,7 @@
 # pylint: disable=import-outside-toplevel, import-error
 
 from abc import ABC
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -138,11 +139,18 @@ class TestSuiteEquilibrate:
         """Test the BioSimSpace minimisation node."""
 
         rig = TestRig(globals()[f"Equilibrate{engine.class_name}"])
+        dump_dir = Path().absolute().parents[1] / "dump"
         res = rig.setup_run(
             inputs={"inp": [[complex_prm7_path, complex_rst7_path]]},
-            parameters={"runtime": 0.001},
+            parameters={"runtime": 0.001, "dump_to": dump_dir},
         )
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
         assert file_names == {"bss_system.gro", "bss_system.top"}
+
+        # Check that the dumping worked
+        # Get the most recent directory in the dump folder
+        dump_output_dir = sorted(dump_dir.iterdir())[-1]
+        assert (dump_output_dir / "bss_system.gro").exists()
+        assert (dump_output_dir / "bss_system.top").exists()
