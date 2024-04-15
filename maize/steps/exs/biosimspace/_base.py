@@ -217,7 +217,7 @@ class _BioSimSpaceBase(Node, ABC):
                 else:
                     shutil.copy(file, dump_dir)
 
-    def _get_executable(self) -> str:
+    def _get_executable(self) -> str | None:
         """Get the full path to the executable."""
         if self.required_callables:
             return shutil.which(self.required_callables[0])
