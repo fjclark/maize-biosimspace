@@ -109,7 +109,7 @@ class _ProductionBase(_BioSimSpaceBase, ABC):
             else self.pressure.value * BSS.Units.Pressure.atm
         )
 
-        return BSS.Protocol.Equilibration(
+        return BSS.Protocol.Production(
             timestep=self.timestep.value * BSS.Units.Time.femtosecond,
             runtime=self.runtime.value * BSS.Units.Time.nanosecond,
             temperature=self.temperature.value * BSS.Units.Temperature.kelvin,

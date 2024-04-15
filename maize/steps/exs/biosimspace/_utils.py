@@ -69,3 +69,93 @@ def create_engine_specific_nodes(
             (abstract_base_node,),
             {"bss_engine": engine, "__doc__": docstring},
         )
+
+
+def get_ligand_from_system(
+    system: "BioSimSpace.Sandpit.Exscientia._SireWrappers.System", ligand_name: str = "LIG"
+) -> "BioSimSpace.Sandpit.Exscientia._SireWrappers.Molecule":
+    """
+    Find the ligand in the system and return it. Should only be called within
+    the `run` method of a node.
+
+    Parameters
+    ----------
+    system : BioSimSpace.Sandpit.Exscientia._SireWrappers.System
+        The system containing the ligand.
+    ligand_name : str
+        The name of the ligand to find. Default is 'LIG'.
+
+    Returns
+    -------
+    BioSimSpace.Sandpit.Exscientia._SireWrappers.Molecule
+        The ligand molecule.
+    """
+    import BioSimSpace.Sandpit.Exscientia as BSS
+
+    try:
+        lig = system.search(f"resname {ligand_name}").molecules()[0]
+    except IndexError:
+        raise ValueError(f"No ligand called '{ligand_name}' found in the input system.")
+
+    return lig
+
+
+def mark_ligand_for_decoupling(
+    system: "BioSimSpace.Sandpit.Exscientia._SireWrappers.System", ligand_name: str = "LIG"
+) -> "BioSimSpace.Sandpit.Exscientia._SireWrappers.System":
+    """
+    Find the ligand in the system, makr it for decoupling,
+    and return the updated ligand. Should only be called within
+    the `run` method of a node.
+
+    Parameters
+    ----------
+    system : BioSimSpace.Sandpit.Exscientia._SireWrappers.System
+        The system containing the ligand.
+    ligand_name : str
+        The name of the ligand to mark for decoupling. Default is 'LIG'.
+
+    Returns
+    -------
+    BioSimSpace.Sandpit.Exscientia._SireWrappers.System
+        The updated system with the ligand marked for decoupling.
+    """
+    import BioSimSpace.Sandpit.Exscientia as BSS
+
+    # Get the ligand
+    lig = get_ligand_from_system(system, ligand_name)
+
+    # Decouple the ligand
+    lig_decoupled = BSS.Align.decouple(lig)
+    system.updateMolecule(system.getIndex(lig), lig_decoupled)
+
+    return system
+
+
+def get_ligand_smiles(
+    system: "BioSimSpace.Sandpit.Exscientia._SireWrappers.System",
+    ligand_name: str = "LIG",
+) -> str:
+    """
+    Get the SMILES string for the ligand in the system. Should only be called within
+    the `run` method of a node.
+
+    Parameters
+    ----------
+    system : BioSimSpace.Sandpit.Exscientia._SireWrappers.System
+        The system containing the ligand.
+    ligand_name : str
+        The name of the ligand to get the SMILES for. Default is 'LIG'.
+
+    Returns
+    -------
+    str
+        The SMILES string for the ligand.
+    """
+    import BioSimSpace.Sandpit.Exscientia as BSS
+
+    # Get the ligand
+    lig = get_ligand_from_system(system, ligand_name)
+
+    # Get the SMILES
+    return lig._sire_object.smiles()

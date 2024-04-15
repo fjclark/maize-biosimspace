@@ -18,6 +18,7 @@ class BSSEngine(StrEnum):
     SOMD = auto()
     NAMD = auto()
     TLEAP = auto()
+    NONE = auto()
 
     @property
     def class_name(self) -> str:
@@ -34,6 +35,7 @@ _ENGINE_CALLABLES = {
     BSSEngine.SOMD: ["somd"],
     BSSEngine.NAMD: ["namd"],
     BSSEngine.TLEAP: ["tleap"],
+    BSSEngine.NONE: [],
 }
 """A mapping between the BioSimSpace engine and the required callables for each engine."""
 

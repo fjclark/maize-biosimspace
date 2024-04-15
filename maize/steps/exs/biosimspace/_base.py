@@ -49,6 +49,8 @@ class _BioSimSpaceBase(Node, ABC):
     given by BSS.IO.fileFormats():
     
     gro87, grotop, mol2, pdb, pdbx, prm7, rst rst7, psf, sdf
+
+    And can also be perturbable systems with the .bss extension.
     """
 
     # Parameters
@@ -67,10 +69,13 @@ class _BioSimSpaceBase(Node, ABC):
         """Get the process to run. This should only be called within `run()`."""
         raise NotImplementedError
 
-    def _load_input(self) -> "BioSimSpace._SireWrappers.System":
+    def _load_input(self, sandpit: bool = False) -> "BioSimSpace._SireWrappers.System":
         """Load the input files. This should only be called within `run()`."""
 
-        import BioSimSpace as BSS
+        if sandpit:
+            import BioSimSpace.Sandpit.Exscientia as BSS
+        else:
+            import BioSimSpace as BSS
 
         input_files = self.inp.receive()
 
@@ -81,12 +86,71 @@ class _BioSimSpaceBase(Node, ABC):
 
         return BSS.IO.readMolecules(input_files)
 
-    def _save_output(self, system: "BioSimSpace._SireWrappers.System") -> None:
+    def _load_perturbable_input(self) -> "BioSimSpace._SireWrappers.System":
+        """Load the perturbable system input files. This should only be called within `run()`."""
+
+        import BioSimSpace.Sandpit.Exscientia as BSS
+
+        input_files = self.inp.receive()
+
+        # Make sure that we have all the required files to load a perturbable system
+        required_file_endings = {
+            "top0": "0.prm7",
+            "coords0": "0.rst7",
+            "top1": "1.prm7",
+            "coords1": "1.rst7",
+        }
+
+        # Get the files
+        files = {k: None for k in required_file_endings.keys()}
+        for k, v in required_file_endings.items():
+            for f in input_files:
+                if f.name.endswith(v):
+                    files[k] = f
+                    break
+
+        # Check that we have all the files
+        if None in files.values():
+            raise ValueError(
+                f"Could not find files with all required endings: {required_file_endings.values()}"
+            )
+
+        # Convert to strings for BSS
+        files = {k: str(v) for k, v in files.items()}
+
+        return BSS.IO.readPerturbableSystem(
+            top0=files["top0"],
+            coords0=files["coords0"],
+            top1=files["top1"],
+            coords1=files["coords1"],
+        )
+
+    def _save_output(
+        self, system: "BioSimSpace._SireWrappers.System", sandpit: bool = False
+    ) -> None:
         """Save the output files. This should only be called within `run()`."""
-        import BioSimSpace as BSS
+        if sandpit:
+            import BioSimSpace.Sandpit.Exscientia as BSS
+        else:
+            import BioSimSpace as BSS
 
         self.out.send(
             [Path(f) for f in BSS.IO.saveMolecules("bss_system", system, ["gro87", "grotop"])]
+        )
+
+    def _save_pertrubable_output(self, system: "BioSimSpace._SireWrappers.System") -> None:
+        """Save the perturbable output files. This should only be called within `run()`."""
+        import BioSimSpace.Sandpit.Exscientia as BSS
+
+        file_base = "bss_system"
+        BSS.IO.savePerturbableSystem(file_base, system)
+        self.out.send(
+            [
+                Path(f)
+                for f in [
+                    f"{file_base}{end}.{ext}" for end in ["0", "1"] for ext in ["prm7", "rst7"]
+                ]
+            ]
         )
 
     def _run_process(self) -> None:
