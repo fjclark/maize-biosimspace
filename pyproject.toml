@@ -17,6 +17,10 @@ dependencies = [
 ]
 
 
+[project.scripts]
+bss_system_prep_free = "maize.graphs.exs.biosimspace.system_preparation:system_preparation_free"
+bss_system_prep_bound = "maize.graphs.exs.biosimspace.system_preparation:system_preparation_bound"
+
 # Not quite sure why this is required (rather than listing the packages explicitly),
 # but without this will only install using --editable, see also:
 # https://stackoverflow.com/questions/43430852/import-only-works-when-module-installed-using-editable-pip-flag

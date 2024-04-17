@@ -8,6 +8,8 @@ to allow parameterisation, solvation, minimisation, equilibration, production, a
 absolute binding free energy calculations using BioSimSpace.
 """
 
+from .combine import *
+from .enums import *
 from .equilibrate import *
 from .exceptions import *
 from .minimise import *

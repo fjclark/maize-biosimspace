@@ -97,6 +97,13 @@ class _EquilibrateBase(_BioSimSpaceBase, ABC):
     kcal_per_mol / angstrom**2
     """
 
+    save_name: Parameter[Path] = Parameter(optional=True)
+    """
+    If supplied, the output files will be saved with
+    this name. E.g., if set to Path("output"), the output
+    files will be output.gro and output.top.
+    """
+
     def run(self) -> None:
         self._run_process()
 

@@ -4,7 +4,7 @@ from enum import auto
 
 from maize.utilities.utilities import StrEnum
 
-__all__ = ["BSSEngine"]
+__all__ = ["BSSEngine", "LegType", "Ensemble", "StageType"]
 
 
 class BSSEngine(StrEnum):
@@ -24,6 +24,31 @@ class BSSEngine(StrEnum):
     def class_name(self) -> str:
         """Get the class name for the engine."""
         return "".join([word.capitalize() for word in self.name.split("_")])
+
+
+class LegType(StrEnum):
+    """Leg types e.g. free ligand or complex."""
+
+    FREE = auto()
+    BOUND = auto()
+
+    @property
+    def class_name(self) -> str:
+        """Get the class name for the leg."""
+        return self.name.capitalize()
+
+    @property
+    def leg_name(self) -> str:
+        """Get the leg name for the leg."""
+        return self.name.lower()
+
+
+class StageType(StrEnum):
+    """Stage types"""
+
+    RESTRAIN = auto()
+    DISCHARGE = auto()
+    VANISH = auto()
 
 
 _ENGINE_CALLABLES = {
