@@ -7,7 +7,8 @@ from typing import Any
 
 import pytest
 
-from maize.core.interface import Parameter
+from maize.core.interface import Input, Parameter
+from maize.core.node import JobResourceConfig
 from maize.utilities.testing import TestRig
 
 from ._base import _BioSimSpaceBase
@@ -31,6 +32,15 @@ class Parameterise(_BioSimSpaceBase):
     """
 
     bss_engine = BSSEngine.TLEAP
+
+    # Input
+    inp: Input[Path] = Input(optional=True)
+    """
+    Path to system input file. This can be in any of
+    the formats given by BSS.IO.fileFormats(), e.g.:
+    
+    mol2, pdb, pdbx, sdf
+    """
 
     # Parameters
     force_field: Parameter[str] = Parameter()
@@ -68,23 +78,38 @@ class Parameterise(_BioSimSpaceBase):
         import BioSimSpace as BSS
 
         # Get the input
-        system = self._load_input()
+        input_file = self.inp.receive()
+        input_sys = BSS.IO.readMolecules(str(input_file))
 
         # Raise an error if more than one molecule is supplied
-        if len(system) > 1:
+        if len(input_sys) > 1:
             raise ValueError("Only one molecule can be parameterised at a time.")
 
-        # Parameterise the molecule
-        param_mol = (
-            BSS.Parameters.parameterise(
-                system[0],
-                forcefield=self.force_field.value,
-                water_model=self.water_model.value,
-                work_dir=str(self.work_dir),
-            )
-            .getMolecule()
-            .toSystem()
+        # Create a python script to be run through run_command (so that we use the
+        # desired scheduling system)
+        param_script = (
+            "import BioSimSpace as BSS\n"
+            f"system = BSS.IO.readMolecules('{input_file}')\n"
+            "system = system[0]\n"
+            f"param_mol = BSS.Parameters.parameterise(\n"
+            f"    system,\n"
+            f"    forcefield='{self.force_field.value}',\n"
+            f"    water_model='{self.water_model.value}',\n"
+            f"    work_dir='{self.work_dir}',\n"
+            ").getMolecule().toSystem()\n"
+            'BSS.IO.saveMolecules("slurm_out", param_mol, ["gro87", "grotop"])\n'
         )
+
+        # Write the script to a file
+        with open("param_script.py", "w") as f:
+            f.write(param_script)
+
+        # Run the script - we want lots of CPUs
+        options = JobResourceConfig(cores_per_process=18, processes_per_node=18)
+        self.run_command("python param_script.py", batch_options=options)
+
+        # Load the output
+        param_mol = BSS.IO.readMolecules(["slurm_out.gro", "slurm_out.top"])
 
         # Save the output
         self._save_output(param_mol)
