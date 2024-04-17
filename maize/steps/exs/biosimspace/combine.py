@@ -77,7 +77,7 @@ class Combine(_BioSimSpaceBase):
 
 
 class TestSuiteCombine:
-    def test_biosimspace_combine(
+    def test_biosimspace_combine_multi(
         self,
         temp_working_dir: Any,
         complex_prm7_path: Any,
@@ -93,6 +93,28 @@ class TestSuiteCombine:
                 "inp": [
                     [
                         [complex_prm7_path, complex_rst7_path],
+                        [complex_prm7_path, complex_rst7_path],
+                    ],
+                ]
+            }
+        )
+        output = res["out"].get()
+        # Get the file name from the path
+        file_names = {f.name for f in output}
+        assert file_names == {"bss_system.gro", "bss_system.top"}
+
+    def test_biosimspace_combine_single(
+        self,
+        temp_working_dir: Any,
+        complex_prm7_path: Any,
+        complex_rst7_path: Any,
+    ) -> None:
+        """Test the BioSimSpace combine node with a single system."""
+        rig = TestRig(Combine)
+        res = rig.setup_run(
+            inputs={
+                "inp": [
+                    [
                         [complex_prm7_path, complex_rst7_path],
                     ],
                 ]
