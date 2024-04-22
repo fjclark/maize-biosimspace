@@ -99,7 +99,7 @@ class TestSuiteCombine:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.gro", "bss_system.top"}
+        assert file_names == {"bss_system.prm7", "bss_system.rst7"}
 
     def test_biosimspace_combine_single(
         self,
@@ -121,4 +121,4 @@ class TestSuiteCombine:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.gro", "bss_system.top"}
+        assert file_names == {"bss_system.prm7", "bss_system.rst7"}

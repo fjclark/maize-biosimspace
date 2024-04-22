@@ -18,7 +18,7 @@ from .enums import BSSEngine, Ensemble
 _ENGINES = [
     Engine
     for Engine in BSSEngine
-    if Engine not in [BSSEngine.OPENMM, BSSEngine.TLEAP, BSSEngine.NAMD]
+    if Engine not in [BSSEngine.OPENMM, BSSEngine.TLEAP, BSSEngine.NAMD, BSSEngine.NONE]
 ]
 """The supported engines for equilibration."""
 
@@ -101,7 +101,7 @@ class _EquilibrateBase(_BioSimSpaceBase, ABC):
     """
     If supplied, the output files will be saved with
     this name. E.g., if set to Path("output"), the output
-    files will be output.gro and output.top.
+    files will be output.rst7 and output.prm7.
     """
 
     def run(self) -> None:
@@ -131,7 +131,7 @@ class _EquilibrateBase(_BioSimSpaceBase, ABC):
         )
 
 
-create_engine_specific_nodes(_EquilibrateBase, __name__, _ENGINES)
+create_engine_specific_nodes(_EquilibrateBase, __name__, _ENGINES, create_exposed_workflows=True)
 
 
 class TestSuiteEquilibrate:
@@ -154,10 +154,10 @@ class TestSuiteEquilibrate:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.gro", "bss_system.top"}
+        assert file_names == {"bss_system.prm7", "bss_system.rst7"}
 
         # Check that the dumping worked
         # Get the most recent directory in the dump folder
         dump_output_dir = sorted(dump_dir.iterdir())[-1]
-        assert (dump_output_dir / "bss_system.gro").exists()
-        assert (dump_output_dir / "bss_system.top").exists()
+        assert (dump_output_dir / "bss_system.prm7").exists()
+        assert (dump_output_dir / "bss_system.rst7").exists()

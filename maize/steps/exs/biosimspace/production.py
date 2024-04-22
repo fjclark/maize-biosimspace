@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from maize.core.interface import Parameter
+from maize.core.interface import Input, Parameter
 from maize.utilities.testing import TestRig
 
 from ._base import _BioSimSpaceBase
@@ -18,7 +18,7 @@ from .enums import BSSEngine, Ensemble
 _ENGINES = [
     Engine
     for Engine in BSSEngine
-    if Engine not in [BSSEngine.OPENMM, BSSEngine.TLEAP, BSSEngine.NAMD]
+    if Engine not in [BSSEngine.OPENMM, BSSEngine.TLEAP, BSSEngine.NAMD, BSSEngine.NONE]
 ]
 """The supported engines for production."""
 
@@ -39,6 +39,19 @@ class _ProductionBase(_BioSimSpaceBase, ABC):
     ----------
     L. O. Hedges et al., JOSS, 2019, 4, 1831.
     L. O. Hedges et al., LiveCoMS, 2023, 5, 2375–2375.
+    """
+
+    # Input
+    # TODO: This shouldn't be necessary as defined in the base class.
+    # However, type info gets messed up if we remove this.
+    # Figure out how to remove this
+    inp: Input[list[Path]] = Input(optional=True)
+    """
+    Paths to system input files. A topology and a coordinate
+    file are required. These can be in any of the formats
+    given by BSS.IO.fileFormats() e.g.:
+    
+    gro87, grotop, prm7, rst rst7
     """
 
     # Parameters
@@ -101,7 +114,7 @@ class _ProductionBase(_BioSimSpaceBase, ABC):
     """
     If supplied, the output files will be saved with
     this name. E.g., if set to Path("output"), the output
-    files will be output.gro and output.top.
+    files will be output.prm7 and output.rst7.
     """
 
     def run(self) -> None:
@@ -130,7 +143,7 @@ class _ProductionBase(_BioSimSpaceBase, ABC):
         )
 
 
-create_engine_specific_nodes(_ProductionBase, __name__, _ENGINES)
+create_engine_specific_nodes(_ProductionBase, __name__, _ENGINES, create_exposed_workflows=True)
 
 
 class TestSuiteProduction:
@@ -153,10 +166,10 @@ class TestSuiteProduction:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.gro", "bss_system.top"}
+        assert file_names == {"bss_system.prm7", "bss_system.rst7"}
 
         # Check that the dumping worked
         # Get the most recent directory in the dump folder
         dump_output_dir = sorted(dump_dir.iterdir())[-1]
-        assert (dump_output_dir / "bss_system.gro").exists()
-        assert (dump_output_dir / "bss_system.top").exists()
+        assert (dump_output_dir / "bss_system.prm7").exists()
+        assert (dump_output_dir / "bss_system.rst7").exists()

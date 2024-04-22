@@ -8,9 +8,11 @@ from typing import Any
 import pytest
 
 from maize.core.interface import Parameter
+from maize.core.workflow import expose
 from maize.utilities.testing import TestRig
 
 from ._base import _BioSimSpaceBase
+from ._utils import get_workflow_fn
 from .enums import BSSEngine
 
 __all__ = ["Solvate"]
@@ -133,6 +135,10 @@ class Solvate(_BioSimSpaceBase):
         self._dump_data()
 
 
+# Generate exposed workflow function with CLI
+solvate_exposed = expose(get_workflow_fn(Solvate))
+
+
 @pytest.fixture
 def complex_dry_prm7_path(shared_datadir: Any) -> Any:
     return shared_datadir / "complex_dry.prm7"
@@ -164,16 +170,21 @@ class TestSuiteSolvate:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.gro", "bss_system.top"}
+        assert file_names == {"bss_system.prm7", "bss_system.rst7"}
 
-        # Read the .gro file and check the box size
-        with open(output[0], "r") as f:
+        # Read the .rst7 file and check the box size
+        rst7_file = [f for f in output if f.name.endswith(".rst7")][0]
+        with open(rst7_file, "r") as f:
             lines = f.readlines()
             box_size = [float(x) for x in lines[-1].split()]
-            assert box_size == [7.239, 7.239, 7.239]
+            for i in range(3):
+                # Check angles
+                assert pytest.approx(box_size[i+3], abs=1e-3) == 90.0
+                # Check box size
+                assert pytest.approx(box_size[i], abs=1e-3) == 72.39
 
         # Check that the dumping worked
         # Get the most recent directory in the dump folder
         dump_output_dir = sorted(dump_dir.iterdir())[-1]
-        assert (dump_output_dir / "bss_system.gro").exists()
-        assert (dump_output_dir / "bss_system.top").exists()
+        assert (dump_output_dir / "bss_system.prm7").exists()
+        assert (dump_output_dir / "bss_system.rst7").exists()

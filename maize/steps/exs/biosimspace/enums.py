@@ -25,6 +25,11 @@ class BSSEngine(StrEnum):
         """Get the class name for the engine."""
         return "".join([word.capitalize() for word in self.name.split("_")])
 
+    @property
+    def function_name(self) -> str:
+        """Get the function name for the engine."""
+        return self.name.lower()
+
 
 class LegType(StrEnum):
     """Leg types e.g. free ligand or complex."""
@@ -49,6 +54,27 @@ class StageType(StrEnum):
     RESTRAIN = auto()
     DISCHARGE = auto()
     VANISH = auto()
+
+    @property
+    def class_name(self) -> str:
+        """Get the class name for the stage."""
+        return self.name.capitalize()
+
+    @property
+    def stage_name(self) -> str:
+        """Get the stage name for the stage."""
+        return self.name.lower()
+
+    @property
+    def perturbation_type(self) -> str:
+        """Get the perturbation type for the stage."""
+        pert_types = {
+            "RESTRAIN": "restraint",
+            "DISCHARGE": "discharge_soft",
+            "VANISH": "vanish_soft",
+        }
+
+        return pert_types[self.name]
 
 
 _ENGINE_CALLABLES = {

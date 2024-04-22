@@ -9,9 +9,11 @@ import pytest
 
 from maize.core.interface import Input, Parameter
 from maize.core.node import JobResourceConfig
+from maize.core.workflow import expose
 from maize.utilities.testing import TestRig
 
 from ._base import _BioSimSpaceBase
+from ._utils import get_workflow_fn
 from .enums import BSSEngine
 
 __all__ = ["Parameterise"]
@@ -97,7 +99,7 @@ class Parameterise(_BioSimSpaceBase):
             f"    water_model='{self.water_model.value}',\n"
             f"    work_dir='{self.work_dir}',\n"
             ").getMolecule().toSystem()\n"
-            'BSS.IO.saveMolecules("slurm_out", param_mol, ["gro87", "grotop"])\n'
+            'BSS.IO.saveMolecules("slurm_out", param_mol, ["prm7", "rst7"])\n'
         )
 
         # Write the script to a file
@@ -109,13 +111,17 @@ class Parameterise(_BioSimSpaceBase):
         self.run_command("python param_script.py", batch_options=options)
 
         # Load the output
-        param_mol = BSS.IO.readMolecules(["slurm_out.gro", "slurm_out.top"])
+        param_mol = BSS.IO.readMolecules(["slurm_out.prm7", "slurm_out.rst7"])
 
         # Save the output
         self._save_output(param_mol)
 
         # Dump the data
         self._dump_data()
+
+
+# Generate exposed workflow function with CLI
+parameterise_exposed = expose(get_workflow_fn(Parameterise))
 
 
 @pytest.fixture
@@ -139,10 +145,10 @@ class TestSuiteParameterise:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.gro", "bss_system.top"}
+        assert file_names == {"bss_system.prm7", "bss_system.rst7"}
 
         # Check that the dumping worked
         # Get the most recent directory in the dump folder
         dump_output_dir = sorted(dump_dir.iterdir())[-1]
-        assert (dump_output_dir / "bss_system.gro").exists()
-        assert (dump_output_dir / "bss_system.top").exists()
+        assert (dump_output_dir / "bss_system.prm7").exists()
+        assert (dump_output_dir / "bss_system.rst7").exists()

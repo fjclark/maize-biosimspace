@@ -16,7 +16,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from maize.core.interface import FileParameter, Input, Output, Parameter, Suffix
+from maize.core.interface import (
+    FileParameter,
+    Input,
+    MultiInput,
+    MultiOutput,
+    Output,
+    Parameter,
+    Suffix,
+)
 from maize.core.node import JobResourceConfig, Node
 from maize.utilities.testing import TestRig
 
@@ -30,6 +38,9 @@ _ENGINES = [BSSEngine.SOMD, BSSEngine.GROMACS]
 """The supported engines for alchemical binding free energy calculations."""
 
 __all__ = [f"AFE{engine.class_name}" for engine in _ENGINES]
+__all__.extend(
+    ["SaveAFEResults", "AFEResult", "CollectAFEResults", "GenerateBoreschRestraintGromacs"]
+)
 
 
 # class DecoupleMolecules(_BioSimSpaceBase):
@@ -95,6 +106,25 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
     L. O. Hedges et al., LiveCoMS, 2023, 5, 2375–2375.
     """
 
+    # Input
+    # TODO: This shouldn't be necessary as defined in the base class.
+    # However, type info gets messed up if we remove this.
+    # Figure out how to remove this
+    inp: Input[list[Path]] = Input(optional=True)
+    """
+    Paths to system input files. A topology and a coordinate
+    file are required. These can be in any of the formats
+    given by BSS.IO.fileFormats() e.g.:
+    
+    gro87, grotop, prm7, rst rst7
+    """
+
+    timestep: Parameter[float] = Parameter(default=2.0)
+    """The integration timestep, in fs."""
+
+    runtime: Parameter[float] = Parameter(default=1.0)
+    """The running time, in ns."""
+
     # Parameters
     append_to_ligand_selection: Parameter[str] = Parameter(default="")
     """
@@ -136,7 +166,7 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
     """
 
     # Outputs
-    boresch_restraint: Output[Path] = Output()
+    boresch_restraint: MultiOutput[Path] = MultiOutput()
     """The selected Boresch restraint object."""
 
     def _run_process(self) -> None:
@@ -167,6 +197,9 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
         # Run the process and wait for it to finish
         self.logger.info(f"Running restraint search with {self.bss_engine.name}...")
         cmd = " ".join([process.exe(), process.getArgString()])
+        # If GROMACS, set ntmp=1 to avoid domain decomposition which can hammer performance
+        if self.bss_engine == BSSEngine.GROMACS:
+            cmd += " -ntmpi 1"
         self.run_command(cmd)
         output_system = process.getSystem(block=True)
         # BioSimSpace sometimes returns None, so we need to check
@@ -187,7 +220,9 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
         restraint_path = self.work_dir / "restraint.pkl"
         with open(restraint_path, "wb") as f:
             pkl.dump(restraint, f)
-        self.boresch_restraint.send(restraint_path)
+
+        for boresch_out in self.boresch_restraint:
+            boresch_out.send(restraint_path)
 
         # Dump the data
         self._dump_data()
@@ -227,10 +262,38 @@ class AFEResult:
     """The free energy changes for the alchemical transformation."""
     error: float
     """The error in the free energy change."""
-    pmf: list[pd.Series]
+    pmf: list[pd.Series] | None
     """The potential of mean force (PMF) for the alchemical transformation."""
-    overlap: list[pd.Series]
+    overlap: list[pd.Series] | None
     """The overlap between windows for the alchemical transformation."""
+
+    # Allow addition or subtraction of two results if they have the same SMILES
+    def __add__(self, other: "AFEResult") -> "AFEResult":
+        if self.smiles != other.smiles:
+            raise ValueError("Cannot add two results with different SMILES.")
+        return AFEResult(
+            smiles=self.smiles,
+            dg=self.dg + other.dg,
+            error=np.sqrt(self.error**2 + other.error**2),
+            pmf=None,
+            overlap=None,
+        )
+
+    # Define subtraction as addition with the negative of the other result
+    def __sub__(self, other: "AFEResult") -> "AFEResult":
+        return self + AFEResult(
+            smiles=other.smiles,
+            dg=-other.dg,
+            error=other.error,
+            pmf=None,
+            overlap=None,
+        )
+
+    # Allow use of sum() function
+    def __radd__(self, other: "AFEResult") -> "AFEResult":
+        if other == 0:
+            return self
+        return self.__add__(other)
 
 
 class SaveAFEResults(Node):
@@ -239,7 +302,9 @@ class SaveAFEResults(Node):
     inp: Input[AFEResult] = Input()
     """An alchemical free energy result."""
 
-    file: FileParameter[Annotated[Path, Suffix("csv")]] = FileParameter(exist_required=False)
+    file: FileParameter[Annotated[Path, Suffix("csv")]] = FileParameter(
+        exist_required=False, default=Path("afe_results.csv")
+    )
     """Output CSV location"""
 
     def run(self) -> None:
@@ -255,6 +320,20 @@ class SaveAFEResults(Node):
                 lines = f.readlines()
                 repeat_no = len([line for line in lines if result.smiles in line]) + 1
             writer.writerow([result.smiles, repeat_no, result.dg, result.error])
+
+
+class CollectAFEResults(Node):
+    """Collect multiple ABFE results and sum them."""
+
+    inp: MultiInput[AFEResult] = MultiInput()
+    """The ABFE results to sum."""
+
+    out: Output[AFEResult] = Output()
+    """The summed ABFE result."""
+
+    def run(self) -> None:
+        afe_res = [self.inp[i].receive() for i in range(len(self.inp))]
+        self.out.send(sum(afe_res))
 
 
 class _AFEBase(_BioSimSpaceBase, ABC):
@@ -273,20 +352,20 @@ class _AFEBase(_BioSimSpaceBase, ABC):
     L. O. Hedges et al., LiveCoMS, 2023, 5, 2375–2375.
     """
 
+    boresch_restraint: Parameter[Path] = Input(optional=True)
+    """
+    The Boresch restraint to use, if performing an absolute binding free energy
+    calculation. This should be a pickle of the BioSimSpace Restraint
+    object.
+    """
+
     # Parameters
     n_replicates: Parameter[int] = Parameter(default=5)
     """The number of replicate calculations to run for each ligand."""
 
-    lam_vals: Parameter[list[float] | pd.Series] = Parameter(default=np.linspace(0, 1, 11))
+    lam_vals: Parameter[list[float] | pd.Series] = Parameter(default=[0.1 * i for i in range(11)])
     """
     The lambda values to use for the alchemical free energy calculation.
-    """
-
-    restraint: FileParameter[Path] = FileParameter(optional=True)
-    """
-    The restraint to use, if performing an absolute binding free energy
-    calculation. This should be a pickle of the BioSimSpace Restraint
-    object.
     """
 
     timestep: Parameter[float] = Parameter(default=2.0)
@@ -307,7 +386,7 @@ class _AFEBase(_BioSimSpaceBase, ABC):
     report_interval: Parameter[int] = Parameter(default=200)
     """The frequency at which statistics are recorded. (In integration steps.)"""
 
-    restrart_interval: Parameter[int] = Parameter(default=1000)
+    restart_interval: Parameter[int] = Parameter(default=1000)
     """
     The frequency at which restart configurations and trajectory frames are saved. 
     (In integration steps.)"""
@@ -331,6 +410,20 @@ class _AFEBase(_BioSimSpaceBase, ABC):
 
     Currently perturubation_type != "full" is only supported by
     BioSimSpace.Process.Somd.
+    """
+
+    dg_sign: Parameter[Literal[-1, 1]] = Parameter(default=1)
+    """
+    If set to -1, the sign of the free energy change will be flipped.
+    This is useful when integrating ABFE stages into an entire ABFE calculation.
+    """
+
+    apply_restraint_correction: Parameter[bool] = Parameter(default=False)
+    """
+    If set to True, the restraint correction will be applied to the free energy
+    change. This is useful when integrating ABFE stages into an entire ABFE calculation.
+    Note that the correction is for releasing the restraint to the standard state volume,
+    and its sign is reversed if dg_sign is set to -1.
     """
 
     runtime: Parameter[float] = Parameter(default=1.0)
@@ -367,7 +460,7 @@ class _AFEBase(_BioSimSpaceBase, ABC):
     """
 
     # Output
-    result: Output[AFEResult] = Output()
+    out: Output[AFEResult] = Output()
     """The results of the alchemical free energy calculation."""
 
     def run(self) -> None:
@@ -388,9 +481,13 @@ class _AFEBase(_BioSimSpaceBase, ABC):
         pert_sys = mark_ligand_for_decoupling(sys, ligand_name="LIG")
 
         # Get the restraint, if it exists
-        if self.restraint.is_set:
-            with self.restraint as f:
+        if self.boresch_restraint.is_set:
+            with open(self.boresch_restraint.receive(), "rb") as f:
                 restraint = pkl.load(f)
+            # Writing and saving a BSS produces formally different systems, but
+            # the restraint system and the system used for the calculation must be the same.
+            # Therefore, use the system from the restraint file.
+            pert_sys = restraint._system
         else:
             restraint = None
 
@@ -404,6 +501,7 @@ class _AFEBase(_BioSimSpaceBase, ABC):
             gpu_support=True,
             restraint=restraint,
             estimator=self.estimator.value,
+            extra_options=self._get_extra_options(self.bss_engine),
         )
 
         # Set up the calculation processes
@@ -416,6 +514,9 @@ class _AFEBase(_BioSimSpaceBase, ABC):
         # is only set in the run_multi method, hence BioSimSpace will set the partition to CPU.
         if self.bss_engine == BSSEngine.SOMD:
             cmds = [" ".join(cmd.split(" ")[:-2]) + " -p CUDA" for cmd in cmds]
+        # If GROMACS, set ntmp=1 to avoid domain decomposition which can hammer performance
+        if self.bss_engine == BSSEngine.GROMACS:
+            cmds = [cmd + " -ntmpi 1" for cmd in cmds]
         work_dirs = [str(p._work_dir) for p in calculation._runner.processes()]
 
         # Run all of the lambda windows, ensuring that they
@@ -424,10 +525,21 @@ class _AFEBase(_BioSimSpaceBase, ABC):
         self.run_multi(cmds, work_dirs, batch_options=options)
 
         # Analyse the stage
+        self.logger.info("Analysing the stage...")
+        self.logger.debug(f"dg_multiplier: {self.dg_sign.value}")
+        dg_multiplier = self.dg_sign.value
         smiles = get_ligand_smiles(sys, ligand_name="LIG")
         pmf, overlap = calculation.analyse()
-        dg = pmf[-1][1].value()
+        dg = pmf[-1][1].value() * dg_multiplier
         dg_error = pmf[-1][2].value()
+        self.logger.info(f"Free energy change for {smiles}: {dg} +/- {dg_error} kcal/mol")
+        # Make sure to apply the correction if necessary
+        if self.apply_restraint_correction.value and restraint is not None:
+            self.logger.info(
+                f"Applying the restraint correction: {restraint.getCorrection().value() * dg_multiplier} kcal/mol"
+            )
+            dg += restraint.getCorrection().value() * dg_multiplier
+
         afe_result = AFEResult(smiles=smiles, dg=dg, error=dg_error, pmf=pmf, overlap=overlap)
 
         # Return the free energy change
@@ -460,6 +572,42 @@ class _AFEBase(_BioSimSpaceBase, ABC):
             perturbation_type=self.perturbation_type.value,
         )
 
+    def _get_extra_options(self, engine: BSSEngine) -> dict | None:
+        """Get extra options to pass to the BSS AlchemicalFreeEnergy object."""
+        if engine == BSSEngine.SOMD:
+            # Work out a reasonable number of cycles as the default is terrible (
+            # produces far too many cycles). Once every 25000 steps is a good
+            # starting point.
+            total_steps = round(
+                self.runtime.value * 1e6 / self.timestep.value
+            )  # runtime in ns, timestep in fs
+            if total_steps < 25000:  # Very short run - just run one cycle
+                ncycles = 1
+                nmoves = total_steps
+            else:
+                ncycles = total_steps // 25000
+                nmoves = 25000
+            if ncycles * nmoves < total_steps:
+                self.logger.warning(
+                    f"The number of steps is not divisible by 25000. The rumtime will be {ncycles * nmoves * self.timestep.value / 1e6} ns"
+                    f" rather than {self.runtime.value} ns."
+                )
+
+            extra_options = {
+                "ncycles": ncycles,
+                "nmoves": nmoves,
+                "hydrogen mass repartitioning factor": 3.0,
+                "cutoff distance": "12 * angstrom",  # As we use RF
+                "integrator": "langevinmiddle",
+                "inverse friction": "1 * picosecond",
+                "thermostat": False,  # Handled by langevin integrator
+            }
+
+        elif engine == BSSEngine.GROMACS:
+            extra_options = None
+
+        return extra_options
+
 
 create_engine_specific_nodes(_AFEBase, __name__, _ENGINES)
 
@@ -490,7 +638,7 @@ class TestSuiteAFE:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.gro", "bss_system.top"}
+        assert file_names == {"bss_system.prm7", "bss_system.rst7"}
 
         # Check that we have a restraint file
         restr_pkl = res["boresch_restraint"].get()
@@ -520,7 +668,10 @@ class TestSuiteAFE:
         rig = TestRig(globals()[f"AFE{engine.class_name}"])
         dump_dir = Path().absolute().parents[1] / "dump"
         res = rig.setup_run(
-            inputs={"inp": [[complex_prm7_path, complex_rst7_path]], "restraint": [restraint_path]},
+            inputs={
+                "inp": [[complex_prm7_path, complex_rst7_path]],
+                "boresch_restraint": [restraint_path],
+            },
             parameters={"runtime": 0.001, "dump_to": dump_dir, "estimator": "TI"},
         )
 
@@ -540,6 +691,43 @@ class TestSuiteAFE:
         dump_output_dir = sorted(dump_dir.iterdir())[-1]
         lam_dirs = [d for d in dump_output_dir.iterdir() if "lambda" in d.name]
         assert len(lam_dirs) == 11
+
+    def test_afe_result(self, temp_working_dir: Any) -> None:
+        """Check that we can add and subtract AFE results as expected."""
+
+        result1 = AFEResult("c1ccccc1", 1.0, 0.1, [], [])
+        result2 = AFEResult("C#N", 1.0, 0.1, [], [])
+
+        # Check that we can add and subtract results
+        sum11 = result1 + result1
+        assert sum11.smiles == "c1ccccc1"
+        assert pytest.approx(sum11.dg) == 2.0
+        assert pytest.approx(sum11.error) == 0.1414213562373095
+
+        diff11 = result1 - result1
+        assert diff11.smiles == "c1ccccc1"
+        assert pytest.approx(diff11.dg) == 0.0
+        assert pytest.approx(diff11.error) == 0.1414213562373095
+
+        with pytest.raises(ValueError):
+            result1 + result2
+
+    def test_collect_afe_results(self, temp_working_dir: Any) -> None:
+        """Test the CollectAFEResults node."""
+
+        rig = TestRig(CollectAFEResults)
+        res = rig.setup_run(
+            inputs={
+                "inp": [
+                    AFEResult("c1ccccc1", 1.0, 0.1, [], []),
+                    AFEResult("c1ccccc1", 1.0, 0.1, [], []),
+                ]
+            }
+        )
+        output = res["out"].get()
+        assert output.smiles == "c1ccccc1"
+        assert pytest.approx(output.dg) == 2.0
+        assert pytest.approx(output.error) == 0.1414213562373095
 
     def test_save_afe_results(self, temp_working_dir: Any) -> None:
         """Test the SaveAFEResults node."""

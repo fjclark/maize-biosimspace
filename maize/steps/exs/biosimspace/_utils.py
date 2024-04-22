@@ -1,8 +1,12 @@
 """Utilities for creating BioSimSpace Nodes"""
 
 import sys
+from pathlib import Path
+from typing import Callable
 
 from maize.core.node import Node
+from maize.core.workflow import Workflow, expose
+from maize.steps.io import Return
 
 from .enums import BSSEngine
 
@@ -32,6 +36,7 @@ def create_engine_specific_nodes(
     abstract_base_node: Node,
     module: str,
     engines: list[BSSEngine] = [Engine for Engine in BSSEngine],
+    create_exposed_workflows: bool = False,
 ) -> None:
     """
     Create engine-specific nodes for BioSimSpace from an abstract base node.
@@ -45,6 +50,8 @@ def create_engine_specific_nodes(
         The module to create the nodes in.
     engines : list[BSSEngine], optional
         The engines to create nodes for, by default all engines defined in the BSSEngine Enum.
+    create_exposed_workflows : bool, optional
+        Whether to create engine-specific exposed workflows for the created nodes, by default False.
     """
     module_dict = sys.modules[module].__dict__
 
@@ -69,6 +76,41 @@ def create_engine_specific_nodes(
             (abstract_base_node,),
             {"bss_engine": engine, "__doc__": docstring},
         )
+
+        if create_exposed_workflows:
+            fn_name = f"{protocol_name.lower()}_{engine.function_name}_exposed"
+            module_dict[fn_name] = expose(get_workflow_fn(module_dict[class_name]))
+
+
+def get_workflow_fn(node: Node) -> Callable[[], Workflow]:
+    """
+    Get a function returning a simple workflow
+    for a single node from a single node (which must be
+    a subclass of _BioSimSpaceBase).
+
+    Parameters
+    ----------
+    node : Node
+        The node to create the workflow from.
+
+    Returns
+    -------
+    Callable[[], Workflow]
+        A function returning a simple workflow for the node.
+    """
+
+    def workflow_fn() -> Workflow:
+        flow = Workflow(name=node.__name__)
+        bss_node = flow.add(node)
+        # We have to connect the output to something
+        retu = flow.add(Return[list[Path]], name="Return")
+        flow.connect(bss_node.out, retu.inp)
+        flow.map(bss_node.inp)
+        flow.map(*bss_node.parameters.values())
+
+        return flow
+
+    return workflow_fn
 
 
 def get_ligand_from_system(
