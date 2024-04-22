@@ -64,3 +64,13 @@ def complex_prm7_path(shared_datadir: Any) -> Any:
 @pytest.fixture
 def complex_rst7_path(shared_datadir: Any) -> Any:
     return shared_datadir / "complex.rst7"
+
+
+@pytest.fixture
+def complex_dry_prm7_path(shared_datadir: Any) -> Any:
+    return shared_datadir / "complex_dry.prm7"
+
+
+@pytest.fixture
+def complex_dry_rst7_path(shared_datadir: Any) -> Any:
+    return shared_datadir / "complex_dry.rst7"

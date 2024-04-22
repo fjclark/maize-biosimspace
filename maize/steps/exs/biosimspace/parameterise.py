@@ -13,7 +13,7 @@ from maize.core.workflow import expose
 from maize.utilities.testing import TestRig
 
 from ._base import _BioSimSpaceBase
-from ._utils import get_workflow_fn
+from ._utils import get_workflow_fn, rename_lig
 from .enums import BSSEngine
 
 __all__ = ["Parameterise"]
@@ -112,6 +112,12 @@ class Parameterise(_BioSimSpaceBase):
 
         # Load the output
         param_mol = BSS.IO.readMolecules(["slurm_out.prm7", "slurm_out.rst7"])
+
+        # If it's a small molecule, rename it to "LIG"
+        n_atoms = param_mol.nAtoms()
+        if n_atoms > 3 and n_atoms < 200:
+            self.logger.info("Renaming ligand to 'LIG'")
+            rename_lig(param_mol, new_name="LIG")
 
         # Save the output
         self._save_output(param_mol)

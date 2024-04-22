@@ -201,3 +201,45 @@ def get_ligand_smiles(
 
     # Get the SMILES
     return lig._sire_object.smiles()
+
+
+def rename_lig(
+    bss_system: "BioSimSpace._SireWrappers._system.System", new_name: str = "LIG"
+) -> None:
+    """
+    Rename the ligand in a BSS system. Should only be called within
+    the `run` method of a node.
+
+    Parameters
+    ----------
+    bss_system : BioSimSpace._SireWrappers._system.System
+        The BSS system.
+    new_name : str
+        The new name for the ligand.
+    Returns
+    -------
+    None
+    """
+    import BioSimSpace as _BSS
+    from BioSimSpace._SireWrappers import Molecule as _Molecule
+    from sire.legacy import Mol as _SireMol
+
+    # Ensure that we only have one molecule
+    if len(bss_system) != 1:
+        raise ValueError("BSS system must only contain one molecule when renaming.")
+
+    # Extract the sire object for the single molecule
+    mol = _Molecule(bss_system[0])
+    mol_sire = mol._sire_object
+
+    # Create an editable version of the sire object
+    mol_edit = mol_sire.edit()
+
+    # Rename the molecule and the residue to the supplied name
+    resname = _SireMol.ResName(new_name)  # type: ignore
+    mol_edit = mol_edit.residue(_SireMol.ResIdx(0)).rename(resname).molecule()  # type: ignore
+    mol_edit = mol_edit.edit().rename(new_name).molecule()
+
+    # Commit the changes and update the system
+    mol._sire_object = mol_edit.commit()
+    bss_system.updateMolecule(0, mol)

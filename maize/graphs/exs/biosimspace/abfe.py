@@ -1,6 +1,7 @@
 """BioSimSpace absolute binding free energy subgraphs and workflows."""
 
 from abc import ABC
+from collections import defaultdict
 from functools import wraps
 from pathlib import Path
 from typing import Annotated, Callable, Literal
@@ -285,7 +286,7 @@ def get_abfe_with_prep_workflow() -> Workflow:
     A workflow which takes prepared but unparameterised input structures and
     runs 1) system preparation, 2) ABFE calculations.
     """
-    flow = Workflow(name="absolute_binding_free_energy")
+    flow = Workflow(name="absolute_binding_free_energy", level="debug")
 
     # Run system preparation for each leg
     sys_prep_free = flow.add(SystemPreparationFree, name="SystemPreparationFree")
@@ -303,12 +304,27 @@ def get_abfe_with_prep_workflow() -> Workflow:
     flow.connect(sys_prep_bound.out, abfe_calc.inp_bound)
     flow.connect(abfe_calc.out, save_results.inp)
 
-    # Map the inputs/ parameters
-    flow.map(*sys_prep_free.parameters.values())
-    flow.map(*sys_prep_free.parameters.values())
-    flow.map(*abfe_calc.parameters.values())
-    # TODO: Figure out why supplying a default value for the save_results.file parameter
-    # doesn't work (still needs to be supplied for CLI if no default is given in SaveAFEResults)
+    # Map inputs/ parameters for prep stages
+    flow.combine_parameters(sys_prep_free.inp, sys_prep_bound.inp, name="lig_sdf_path")
+    flow.combine_parameters(sys_prep_bound.protein_pdb, name="protein_pdb_path")
+    # Get a dict of all parameters for each system preparation stage where parameters with the same name
+    # Share the same key in the dict
+    params_prep = defaultdict(list)
+    params_prep = {param.name: [param] for param in sys_prep_bound.parameters.values()}
+    # Now add the free params, appending to the list if the key already exists
+    for param in sys_prep_free.parameters.values():
+        params_prep[param.name].append(param)
+
+    for param_name, param_vals in params_prep.items():
+        if param_name in ["protein_pdb"]:
+            continue
+        prefix = "prep_" if "force_field" not in param_name else ""
+        flow.combine_parameters(*param_vals, name=f"{prefix}{param_name}")
+
+    # Map inputs/ parameters for the abfe stage
+    for param in abfe_calc.parameters.values():
+        flow.combine_parameters(param, name=f"abfe_{param.name}")
+
     flow.combine_parameters(save_results.file, name="results_file_name")
 
     return flow

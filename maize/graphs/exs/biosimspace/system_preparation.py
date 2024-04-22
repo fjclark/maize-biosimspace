@@ -18,7 +18,12 @@ from maize.steps.exs.biosimspace import (
 )
 from maize.steps.io import Return, Void
 
-__all__ = ["SystemPreparationFree", "SystemPreparationBound"]
+__all__ = [
+    "SystemPreparationFree",
+    "SystemPreparationBound",
+    "system_prep_free",
+    "system_prep_bound",
+]
 
 
 class _SystemPreparationBase(Graph, ABC):
@@ -87,14 +92,14 @@ class _SystemPreparationBase(Graph, ABC):
             # param_wat = (
             #     self.add(Parameterise, name="ParameteriseWater") if self.water_pdb.is_set else None
             # )
-        combine_systems = self.add(Combine)
-        solvate = self.add(Solvate)
+        combine_systems = self.add(Combine, name="CombineSystems")
+        solvate = self.add(Solvate, name="Solvate")
         minimise = self.add(MinimiseGromacs, name="Minimise")
         heat = self.add(EquilibrateGromacs, name="Heat")
         nvt_restrained = self.add(EquilibrateGromacs, name="NVT_Restrained")
         nvt_unrestrained = self.add(EquilibrateGromacs, name="NVT_Unrestrained")
         if self.leg_type == LegType.BOUND:
-            npt_restrained = self.add(EquilibrateGromacs, name="NPT_RESTRAINED")
+            npt_restrained = self.add(EquilibrateGromacs, name="NPT_Restrained")
         npt_unrestrained = self.add(EquilibrateGromacs, name="NPT_Unrestrained")
 
         # Set the parameters
@@ -212,7 +217,7 @@ def _create_sys_prep_workflow_fn(leg_type: LegType) -> Callable[[], Workflow]:
 
     def sys_prep_workflow_fn() -> Workflow:
 
-        flow = Workflow(name=f"system_preparation_{leg_type.leg_name}")
+        flow = Workflow(name=f"system_preparation_{leg_type.leg_name}", cleanup_temp=False)
 
         sys_prep_class = (
             SystemPreparationFree if leg_type == LegType.FREE else SystemPreparationBound
@@ -242,7 +247,7 @@ def _create_sys_prep_workflow_fn(leg_type: LegType) -> Callable[[], Workflow]:
 
 
 # Create leg-specific workflows with CLI
-# system_preparation_free_exposed = _create_sys_prep_workflow_fn(LegType.FREE)
-# system_preparation_bound = _create_sys_prep_workflow_fn(LegType.BOUND)
-system_prep_free_exposed = expose(_create_sys_prep_workflow_fn(LegType.FREE))
-system_prep_bound_exposed = expose(_create_sys_prep_workflow_fn(LegType.BOUND))
+system_prep_free = _create_sys_prep_workflow_fn(LegType.FREE)
+system_prep_bound = _create_sys_prep_workflow_fn(LegType.BOUND)
+system_prep_free_exposed = expose(system_prep_free)
+system_prep_bound_exposed = expose(system_prep_bound)

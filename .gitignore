@@ -10,5 +10,6 @@ coverage
 /test-config.toml
 _build
 test
+tmp
 testing.ipynb
 deplicenses.txt

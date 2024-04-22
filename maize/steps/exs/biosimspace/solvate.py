@@ -139,15 +139,6 @@ class Solvate(_BioSimSpaceBase):
 solvate_exposed = expose(get_workflow_fn(Solvate))
 
 
-@pytest.fixture
-def complex_dry_prm7_path(shared_datadir: Any) -> Any:
-    return shared_datadir / "complex_dry.prm7"
-
-
-@pytest.fixture
-def complex_dry_rst7_path(shared_datadir: Any) -> Any:
-    return shared_datadir / "complex_dry.rst7"
-
 
 class TestSuiteSolvate:
     def test_biosimspace_solvation(

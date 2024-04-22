@@ -46,7 +46,6 @@ class Combine(_BioSimSpaceBase):
 
         # Get the input
         systems = self._load_input()
-
         # Combine the systems
         combined_system = systems[0]
         for sys in systems[1:]:
@@ -73,6 +72,18 @@ class Combine(_BioSimSpaceBase):
         # Load the input files
         systems = [BSS.IO.readMolecules(f) for f in input_files]
 
+        if len(systems) == 1:
+            return systems
+
+        # Make sure that we don't have repeat systems
+        sys_0_len = len(systems[0])
+        sys_0_first_mol = systems[0][0]._sire_object.name().value()
+        for sys in systems[1:]:
+            if len(sys) == sys_0_len and sys[0]._sire_object.name().value() == sys_0_first_mol:
+                raise ValueError(
+                    "The systems are the same size and have the same first molecule, so they are likely the same system."
+                )
+
         return systems
 
 
@@ -82,17 +93,19 @@ class TestSuiteCombine:
         temp_working_dir: Any,
         complex_prm7_path: Any,
         complex_rst7_path: Any,
+        complex_dry_prm7_path: Any,
+        complex_dry_rst7_path: Any,
     ) -> None:
         """
-        Test the BioSimSpace combine node. We'll just combine two
-        identical systems for simplicity.
+        Test the BioSimSpace combine node. We'll combine the dry and solvated
+        systems for simplicity, but in reality we would never want to do this.
         """
         rig = TestRig(Combine)
         res = rig.setup_run(
             inputs={
                 "inp": [
                     [[complex_prm7_path, complex_rst7_path]],
-                    [[complex_prm7_path, complex_rst7_path]],
+                    [[complex_dry_prm7_path, complex_dry_rst7_path]],
                 ],
             }
         )
@@ -100,6 +113,28 @@ class TestSuiteCombine:
         # Get the file name from the path
         file_names = {f.name for f in output}
         assert file_names == {"bss_system.prm7", "bss_system.rst7"}
+
+    def test_biosimspace_combine_multi_fail(
+        self,
+        temp_working_dir: Any,
+        complex_prm7_path: Any,
+        complex_rst7_path: Any,
+    ) -> None:
+        """
+        Test the BioSimSpace combine node. Check that combining two of
+        the same system raises an error.
+        """
+        rig = TestRig(Combine)
+        with pytest.raises(ValueError):
+            res = rig.setup_run(
+                inputs={
+                    "inp": [
+                        [[complex_prm7_path, complex_rst7_path]],
+                        [[complex_prm7_path, complex_rst7_path]],
+                    ],
+                }
+            )
+            output = res["out"].get()
 
     def test_biosimspace_combine_single(
         self,

@@ -146,7 +146,9 @@ class _BioSimSpaceBase(Node, ABC):
         # Save the output if requested.
         if self.save_name.is_set:
             file_base = str(self.save_name.value)
-            BSS.IO.saveMolecules(file_base, system, ["prm7", "rst7"])
+            BSS.IO.saveMolecules(
+                file_base, system, ["prm7", "rst7"], property_map={"velocity": "foo"}
+            )
 
         for out in self.out:
             out.send(
