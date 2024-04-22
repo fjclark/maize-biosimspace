@@ -18,7 +18,7 @@ from maize.steps.exs.biosimspace import (
 )
 from maize.steps.io import Return, Void
 
-__all__ = ["system_preparation_free", "system_preparation_bound"]
+__all__ = ["SystemPreparationFree", "SystemPreparationBound"]
 
 
 class _SystemPreparationBase(Graph, ABC):
@@ -242,7 +242,7 @@ def _create_sys_prep_workflow_fn(leg_type: LegType) -> Callable[[], Workflow]:
 
 
 # Create leg-specific workflows with CLI
-# system_preparation_free = _create_sys_prep_workflow_fn(LegType.FREE)
+# system_preparation_free_exposed = _create_sys_prep_workflow_fn(LegType.FREE)
 # system_preparation_bound = _create_sys_prep_workflow_fn(LegType.BOUND)
-system_preparation_free = expose(_create_sys_prep_workflow_fn(LegType.FREE))
-system_preparation_bound = expose(_create_sys_prep_workflow_fn(LegType.BOUND))
+system_prep_free_exposed = expose(_create_sys_prep_workflow_fn(LegType.FREE))
+system_prep_bound_exposed = expose(_create_sys_prep_workflow_fn(LegType.BOUND))
