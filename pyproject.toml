@@ -1,43 +1,42 @@
 [build-system]
-requires = ["setuptools"]
+requires = [ "setuptools",]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "maize-biosimspace"
 description = "Custom maize nodes and subgraphs"
 version = "0.1.0"
-authors = [{name = "Finlay CLark"}]
-maintainers = [{name = "Finlay Clark", email = "finlay.clark@ed.ac.uk"}]
 requires-python = ">=3.10"
-dependencies = [
-    "maize>=0.6.0",
-    "rdkit>=2022.9.5",
-    "pandas>=2.0.0",
-    "biosimspace"
-]
+dependencies = [ "maize>=0.6.0", "rdkit>=2022.9.5", "pandas>=2.0.0", "biosimspace",]
+[[project.authors]]
+name = "Finlay CLark"
 
+[[project.maintainers]]
+name = "Finlay Clark"
+email = "finlay.clark@ed.ac.uk"
 
 [project.scripts]
-bss_system_prep_free = "maize.graphs.exs.biosimspace.system_preparation:system_preparation_free"
-bss_system_prep_bound = "maize.graphs.exs.biosimspace.system_preparation:system_preparation_bound"
-
-# Not quite sure why this is required (rather than listing the packages explicitly),
-# but without this will only install using --editable, see also:
-# https://stackoverflow.com/questions/43430852/import-only-works-when-module-installed-using-editable-pip-flag
-[tool.setuptools.packages.find]
-include = ["maize*"]
-
-[tool.pytest.ini_options]
-config = "test-config.toml"
-log_cli = true
-log_cli_level = "DEBUG"
-addopts = ["-vv"]
-python_files = ["*.py"]
-python_classes = ["TestSuite*"]
-testpaths = [
-    "maize/steps",
-    "tests",
-]
+bss_system_prep_free = "maize.graphs.exs.biosimspace.system_preparation:system_prep_free_exposed"
+bss_system_prep_bound = "maize.graphs.exs.biosimspace.system_preparation:system_prep_bound_exposed"
+bss_abfe_no_prep = "maize.graphs.exs.biosimspace.abfe:abfe_no_prep_exposed"
+bss_abfe_with_prep = "maize.graphs.exs.biosimspace.abfe:abfe_with_prep_exposed"
+bss_parameterise = "maize.steps.exs.biosimspace.parameterise:parameterise_exposed"
+bss_solvate = "maize.steps.exs.biosimspace.solvate:solvate_exposed"
+bss_minimise_gromacs = "maize.steps.exs.biosimspace.minimise:minimise_gromacs_exposed"
+bss_minimise_pmemd_cuda = "maize.steps.exs.biosimspace.minimise:minimise_pmemd_cuda_exposed"
+bss_minimise_pmemd = "maize.steps.exs.biosimspace.minimise:minimise_pmemd_exposed"
+bss_minimise_sander = "maize.steps.exs.biosimspace.minimise:minimise_sander_exposed"
+bss_minimise_somd = "maize.steps.exs.biosimspace.minimise:minimise_somd_exposed"
+bss_equilibrate_gromacs = "maize.steps.exs.biosimspace.equilibrate:equilibrate_gromacs_exposed"
+bss_equilibrate_pmemd_cuda = "maize.steps.exs.biosimspace.equilibrate:equilibrate_pmemd_cuda_exposed"
+bss_equilibrate_pmemd = "maize.steps.exs.biosimspace.equilibrate:equilibrate_pmemd_exposed"
+bss_equilibrate_sander = "maize.steps.exs.biosimspace.equilibrate:equilibrate_sander_exposed"
+bss_equilibrate_somd = "maize.steps.exs.biosimspace.equilibrate:equilibrate_somd_exposed"
+bss_production_gromacs = "maize.steps.exs.biosimspace.production:production_gromacs_exposed"
+bss_production_pmemd_cuda = "maize.steps.exs.biosimspace.production:production_pmemd_cuda_exposed"
+bss_production_pmemd = "maize.steps.exs.biosimspace.production:production_pmemd_exposed"
+bss_production_sander = "maize.steps.exs.biosimspace.production:production_sander_exposed"
+bss_production_somd = "maize.steps.exs.biosimspace.production:production_somd_exposed"
 
 [tool.mypy]
 follow_imports = "silent"
@@ -51,3 +50,15 @@ line-length = 100
 
 [tool.ruff]
 line-length = 100
+
+[tool.pytest.ini_options]
+config = "test-config.toml"
+log_cli = true
+log_cli_level = "DEBUG"
+addopts = [ "-vv",]
+python_files = [ "*.py",]
+python_classes = [ "TestSuite*",]
+testpaths = [ "maize/steps", "tests",]
+
+[tool.setuptools.packages.find]
+include = [ "maize*",]
