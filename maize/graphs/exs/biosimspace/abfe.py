@@ -31,14 +31,14 @@ from maize.utilities.macros import parallel
 from .system_preparation import SystemPreparationBound, SystemPreparationFree
 
 __all__ = [
-    "AbsoluteBindingFreeEnergySingle",
-    "AbsoluteBindingFreeEnergyMulti",
+    "AbsoluteBindingFreeEnergySingleRepeat",
+    "AbsoluteBindingFreeEnergyMultiRepeat",
     "abfe_no_prep_workflow",
     "abfe_with_prep_workflow",
 ]
 
 
-class AbsoluteBindingFreeEnergySingle(Graph):
+class AbsoluteBindingFreeEnergySingleRepeat(Graph):
     """
     A class for running a single absolute binding free energy calculation
     using SOMD through BioSimSpace. This requires parameterised and equilibrated
@@ -241,7 +241,7 @@ class AbsoluteBindingFreeEnergySingle(Graph):
         self.out = self.map_port(collect_results.out)
 
 
-class AbsoluteBindingFreeEnergyMulti(Graph):
+class AbsoluteBindingFreeEnergyMultiRepeat(Graph):
     """
     A class for running multiple repeat absolute binding free energy calculations
     using SOMD through BioSimSpace. This requires unparameterised
@@ -263,7 +263,7 @@ class AbsoluteBindingFreeEnergyMulti(Graph):
         # Add all the repeat ABFE nodes
         abfe_subgraph = self.add(
             parallel(
-                AbsoluteBindingFreeEnergySingle,
+                AbsoluteBindingFreeEnergySingleRepeat,
                 n_branches=self.n_repeats.value,
                 inputs=[],
                 constant_inputs=["inp_bound", "inp_free"],
@@ -282,6 +282,53 @@ class AbsoluteBindingFreeEnergyMulti(Graph):
         self.out = self.map_port(accumulate_results.out, name="out")
 
 
+class AbsoluteBindingFreeEnergyMultiwithPrep(Graph):
+    """
+    A class for running multiple repeat absolute binding free energy calculations
+    from unparameterised input structures.
+    """
+
+    def build(self) -> None:
+
+        # Run system preparation for each leg
+        sys_prep_free = self.add(SystemPreparationFree, name="SystemPreparationFree")
+        sys_prep_bound = self.add(SystemPreparationBound, name="SystemPreparationBound")
+
+        # Run repeats of ABFE calculations
+        abfe_calc = self.add(AbsoluteBindingFreeEnergyMultiRepeat, name="AbsoluteBindingFreeEnergy")
+
+        # Save the ABFE results
+        save_results = self.add(SaveAFEResults, name="SaveAFEResults")
+
+        # Connect the nodes
+        self.connect(sys_prep_free.out, abfe_calc.inp_free)
+        self.connect(sys_prep_bound.out, abfe_calc.inp_bound)
+        self.connect(abfe_calc.out, save_results.inp)
+
+        # Map inputs/ parameters for prep stages
+        self.combine_parameters(sys_prep_free.inp, sys_prep_bound.inp, name="lig_sdf_path")
+        self.combine_parameters(sys_prep_bound.protein_pdb, name="protein_pdb_path")
+        # Get a dict of all parameters for each system preparation stage where parameters with the same name
+        # Share the same key in the dict
+        params_prep = defaultdict(list)
+        params_prep = {param.name: [param] for param in sys_prep_bound.parameters.values()}
+        # Now add the free params, appending to the list if the key already exists
+        for param in sys_prep_free.parameters.values():
+            params_prep[param.name].append(param)
+
+        for param_name, param_vals in params_prep.items():
+            if param_name in ["protein_pdb"]:
+                continue
+            prefix = "prep_" if "force_field" not in param_name else ""
+            self.combine_parameters(*param_vals, name=f"{prefix}{param_name}")
+
+        # Map inputs/ parameters for the abfe stage
+        for param in abfe_calc.parameters.values():
+            self.combine_parameters(param, name=f"abfe_{param.name}")
+
+        self.combine_parameters(save_results.file, name="results_file_name")
+
+
 def get_abfe_no_prep_workflow() -> Workflow:
     """
     A workflow to perform absolute binding free energy calculations given
@@ -290,14 +337,13 @@ def get_abfe_no_prep_workflow() -> Workflow:
 
     flow = Workflow(name="absolute_binding_free_energy_no_prep")
 
-    abfe_calc = flow.add(AbsoluteBindingFreeEnergyMulti, name="AbsoluteBindingFreeEnergy")
+    abfe_calc = flow.add(AbsoluteBindingFreeEnergyMultiRepeat, name="AbsoluteBindingFreeEnergy")
     save_results = flow.add(SaveAFEResults, name="SaveAFEResults")
 
     # Connect the nodes/ subgraphs
     flow.connect(abfe_calc.out, save_results.inp)
 
     # Map the inputs/ parameters
-    flow.map(abfe_calc.n_repeats)
     flow.combine_parameters(abfe_calc.inp_bound, name="inp_bound")
     flow.combine_parameters(abfe_calc.inp_free, name="inp_free")
     flow.map(*abfe_calc.parameters.values())
@@ -319,43 +365,13 @@ def get_abfe_with_prep_workflow() -> Workflow:
     """
     flow = Workflow(name="absolute_binding_free_energy")
 
-    # Run system preparation for each leg
-    sys_prep_free = flow.add(SystemPreparationFree, name="SystemPreparationFree")
-    sys_prep_bound = flow.add(SystemPreparationBound, name="SystemPreparationBound")
+    # Run setup and repeats of ABFE calculations
+    abfe_with_prep = flow.add(
+        AbsoluteBindingFreeEnergyMultiwithPrep, name="AbsoluteBindingFreeEnergy"
+    )
 
-    # Run repeats of ABFE calculations
-    abfe_calc = flow.add(AbsoluteBindingFreeEnergyMulti, name="AbsoluteBindingFreeEnergy")
-
-    # Save the ABFE results
-    save_results = flow.add(SaveAFEResults, name="SaveAFEResults")
-
-    # Connect the nodes
-    flow.connect(sys_prep_free.out, abfe_calc.inp_free)
-    flow.connect(sys_prep_bound.out, abfe_calc.inp_bound)
-    flow.connect(abfe_calc.out, save_results.inp)
-
-    # Map inputs/ parameters for prep stages
-    flow.combine_parameters(sys_prep_free.inp, sys_prep_bound.inp, name="lig_sdf_path")
-    flow.combine_parameters(sys_prep_bound.protein_pdb, name="protein_pdb_path")
-    # Get a dict of all parameters for each system preparation stage where parameters with the same name
-    # Share the same key in the dict
-    params_prep = defaultdict(list)
-    params_prep = {param.name: [param] for param in sys_prep_bound.parameters.values()}
-    # Now add the free params, appending to the list if the key already exists
-    for param in sys_prep_free.parameters.values():
-        params_prep[param.name].append(param)
-
-    for param_name, param_vals in params_prep.items():
-        if param_name in ["protein_pdb"]:
-            continue
-        prefix = "prep_" if "force_field" not in param_name else ""
-        flow.combine_parameters(*param_vals, name=f"{prefix}{param_name}")
-
-    # Map inputs/ parameters for the abfe stage
-    for param in abfe_calc.parameters.values():
-        flow.combine_parameters(param, name=f"abfe_{param.name}")
-
-    flow.combine_parameters(save_results.file, name="results_file_name")
+    # Map the inputs/ parameters
+    flow.map(*abfe_with_prep.parameters.values())
 
     return flow
 
