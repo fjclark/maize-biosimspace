@@ -1,7 +1,9 @@
 """A BioSimSpace base Node for running BioSimSpace simulations."""
 
 # pylint: disable=import-outside-toplevel, import-error
+import random
 import shutil
+import string
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -151,8 +153,9 @@ class _BioSimSpaceBase(Node, ABC):
             )
 
         for out in self.out:
-            # Get unique format to avoid files being overwritten
-            file_base = f"bss_system_{time.strftime('%Y-%m-%d_%H-%M-%S')}"
+            # Add a random string to the file name to avoid overwriting
+            random_string = "".join(random.choices(string.ascii_letters, k=10))
+            file_base = f"bss_system_{random_string}"
             out.send(
                 [
                     Path(f)

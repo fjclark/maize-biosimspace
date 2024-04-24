@@ -4,9 +4,11 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+from maize.core.interface import Input, Output
 from maize.core.node import Node
 from maize.core.workflow import Workflow, expose
 from maize.steps.io import Return
+from maize.utilities.chem import Isomer
 
 from .enums import BSSEngine
 
@@ -243,3 +245,32 @@ def rename_lig(
     # Commit the changes and update the system
     mol._sire_object = mol_edit.commit()
     bss_system.updateMolecule(0, mol)
+
+
+class IsomerToSDF(Node):
+    """
+    Convert a Isomer object to a path to an SDF.
+    """
+
+    # Input
+    inp: Input[Isomer] = Input()
+    """
+    Input isomer object.
+    """
+
+    out: Output[Path] = Output()
+    """
+    Path to the output SDF file.
+    """
+
+    def run(self) -> None:
+
+        # Get the sdf input
+        isomer = self.inp.receive()
+
+        # Save to an sdf file
+        sdf_path = Path("isomer.sdf")
+        isomer.to_sdf(sdf_path)
+
+        # Send the path to the output
+        self.out.send(sdf_path)
