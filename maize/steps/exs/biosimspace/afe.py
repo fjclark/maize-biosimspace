@@ -299,8 +299,8 @@ class AFEResult:
 class SaveAFEResults(Node):
     """Save an AFE result object to a CSV. The PMF and overlap information is discarded."""
 
-    inp: Input[AFEResult] = Input()
-    """An alchemical free energy result."""
+    inp: Input[AFEResult | list[AFEResult]] = Input()
+    """An alchemical free energy result, or a list of results."""
 
     file: FileParameter[Annotated[Path, Suffix("csv")]] = FileParameter(
         exist_required=False, default=Path("afe_results.csv")
@@ -308,18 +308,21 @@ class SaveAFEResults(Node):
     """Output CSV location"""
 
     def run(self) -> None:
-        result = self.inp.receive()
+        results = self.inp.receive()
+        # Convert non-lists into lists
+        results = [results] if not isinstance(results, list) else results
         with open(self.file.filepath, "a") as out:
             writer = csv.writer(out, delimiter=",", quoting=csv.QUOTE_MINIMAL)
-            # Only write header if it's empty
-            if not self.file.filepath.exists() or self.file.filepath.stat().st_size == 0:
-                writer.writerow(["smiles", "repeat_no", "dg", "error"])
-            # Get the repeat number by checking if there are already lines with the current smiles
-            # present
-            with open(self.file.filepath, "r") as f:
-                lines = f.readlines()
-                repeat_no = len([line for line in lines if result.smiles in line]) + 1
-            writer.writerow([result.smiles, repeat_no, result.dg, result.error])
+            for result in results:
+                # Only write header if it's empty
+                if not self.file.filepath.exists() or self.file.filepath.stat().st_size == 0:
+                    writer.writerow(["smiles", "repeat_no", "dg", "error"])
+                # Get the repeat number by checking if there are already lines with the current smiles
+                # present
+                with open(self.file.filepath, "r") as f:
+                    lines = f.readlines()
+                    repeat_no = len([line for line in lines if result.smiles in line]) + 1
+                writer.writerow([result.smiles, repeat_no, result.dg, result.error])
 
 
 class CollectAFEResults(Node):

@@ -151,11 +151,13 @@ class _BioSimSpaceBase(Node, ABC):
             )
 
         for out in self.out:
+            # Get unique format to avoid files being overwritten
+            file_base = f"bss_system_{time.strftime('%Y-%m-%d_%H-%M-%S')}"
             out.send(
                 [
                     Path(f)
                     for f in BSS.IO.saveMolecules(
-                        "bss_system",
+                        file_base,
                         system,
                         fileformat=["prm7", "rst7"],
                         # Throw away velocity information to avoid
