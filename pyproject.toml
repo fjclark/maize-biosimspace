@@ -53,7 +53,7 @@ line-length = 100
 line-length = 100
 
 [tool.pytest.ini_options]
-config = "test-config.toml"
+config = "devtools/test-config.toml"
 log_cli = true
 log_cli_level = "DEBUG"
 addopts = [ "-vv",]
