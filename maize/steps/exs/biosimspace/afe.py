@@ -526,7 +526,7 @@ class _AFEBase(_BioSimSpaceBase, ABC):
         # Run all of the lambda windows, ensuring that they
         # get one GPU each
         options = JobResourceConfig(custom_attributes={"gres":"gpu:1", "mem":"24GB"})
-        self.run_multi(cmds, work_dirs, batch_options=options, prefer_batch=True)
+        self.run_multi(cmds, work_dirs, batch_options=options)
 
         # Analyse the stage
         self.logger.info("Analysing the stage...")
