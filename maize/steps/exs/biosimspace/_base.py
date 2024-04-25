@@ -224,8 +224,8 @@ class _BioSimSpaceBase(Node, ABC):
         # If GROMACS, set ntmp=1 to avoid domain decomposition which can hammer performance
         if self.bss_engine == BSSEngine.GROMACS:
             cmd += " -ntmpi 1"
-        # options = JobResourceConfig(gpus_per_process=1, exclusive_use=True)
-        self.run_command(cmd)  # , batch_options=options)
+        options = JobResourceConfig(custom_attributes={"gres":"gpu:1", "mem":"24GB"})
+        self.run_command(cmd, batch_options=options, prefer_batch=True)
         output_system = process.getSystem(block=True)
         # BioSimSpace sometimes returns None, so we need to check
         if output_system is None:

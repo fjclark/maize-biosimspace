@@ -106,9 +106,9 @@ class Parameterise(_BioSimSpaceBase):
         with open("param_script.py", "w") as f:
             f.write(param_script)
 
-        # Run the script - we want lots of CPUs
-        options = JobResourceConfig(cores_per_process=18, processes_per_node=18)
-        self.run_command("python param_script.py", batch_options=options)
+        # Run the script - we want lots of memory
+        options = JobResourceConfig(custom_attributes={"mem":"24GB"})
+        self.run_command("python param_script.py", batch_options=options, prefer_batch=True)
 
         # Load the output
         param_mol = BSS.IO.readMolecules(["slurm_out.prm7", "slurm_out.rst7"])

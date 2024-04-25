@@ -200,7 +200,8 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
         # If GROMACS, set ntmp=1 to avoid domain decomposition which can hammer performance
         if self.bss_engine == BSSEngine.GROMACS:
             cmd += " -ntmpi 1"
-        self.run_command(cmd)
+        options = JobResourceConfig(custom_attributes={"gres":"gpu:1", "mem":"24GB"})
+        self.run_command(cmd, batch_options=options, prefer_batch=True)
         output_system = process.getSystem(block=True)
         # BioSimSpace sometimes returns None, so we need to check
         if output_system is None:
@@ -524,8 +525,8 @@ class _AFEBase(_BioSimSpaceBase, ABC):
 
         # Run all of the lambda windows, ensuring that they
         # get one GPU each
-        options = JobResourceConfig(gpus_per_process=1)
-        self.run_multi(cmds, work_dirs, batch_options=options)
+        options = JobResourceConfig(custom_attributes={"gres":"gpu:1", "mem":"24GB"})
+        self.run_multi(cmds, work_dirs, batch_options=options, prefer_batch=True)
 
         # Analyse the stage
         self.logger.info("Analysing the stage...")
