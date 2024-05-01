@@ -112,6 +112,13 @@ def get_workflow_fn(node: Node) -> Callable[[], Workflow]:
 
         return flow
 
+    # The below steps are required to get the workflow summary to
+    # show when -h is supplied to the CLI
+    # Rename workflow_fn according to the node name
+    workflow_fn.__name__ = f"{node.__name__.lower()}_workflow"
+    # Add the docstring from the node to the workflow function
+    workflow_fn.__doc__ = node.__doc__
+
     return workflow_fn
 
 
