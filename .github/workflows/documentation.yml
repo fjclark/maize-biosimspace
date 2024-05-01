@@ -19,14 +19,7 @@ jobs:
       - name: Sphinx build
         run: |
           sphinx-build docs _build
-      # - name: Create .nojekyll file
-      #   run: touch .nojekyll
+      - name: Create .nojekyll file
+        run: touch .nojekyll
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        with:
-          publish_branch: gh-pages
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: /
-          enable_jekyll: false
-          force_orphan: true
+        run: mkdocs gh-deploy --force
