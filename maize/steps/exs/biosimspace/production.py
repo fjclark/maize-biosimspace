@@ -56,35 +56,35 @@ class _ProductionBase(_BioSimSpaceBase, ABC):
 
     # Parameters
     timestep: Parameter[float] = Parameter(default=2.0)
-    """The integration timestep, in fs."""
+    """The integration timestep, in fs. Default = 2.0 fs."""
 
     runtime: Parameter[float] = Parameter(default=1.0)
-    """The running time, in ns."""
+    """The running time, in ns. Default = 1.0 ns."""
 
     temperature: Parameter[float] = Parameter(default=300.0)
-    """The temperature, in K."""
+    """The temperature, in K. Default = 300.0 K."""
 
     ensemble: Parameter[Ensemble] = Parameter(default=Ensemble.NPT)
-    """The ensemble to use."""
+    """The ensemble to use. Default = NPT."""
 
     pressure: Parameter[float] = Parameter(default=1)
     """
-    The pressure, in atm. This is ignored if the ensemble is NVT."""
+    The pressure, in atm. This is ignored if the ensemble is NVT. Default = 1 atm."""
 
     thermostat_time_constant: Parameter[float] = Parameter(default=1.0)
-    """Time constant for thermostat coupling, in ps."""
+    """Time constant for thermostat coupling, in ps. Default = 1.0 ps."""
 
     report_interval: Parameter[int] = Parameter(default=100)
-    """The frequency at which statistics are recorded. (In integration steps.)"""
+    """The frequency at which statistics are recorded. (In integration steps.) Default = 100."""
 
     restart_interval: Parameter[int] = Parameter(default=500)
     """
     The frequency at which restart configurations and trajectory
-    frames are saved. (In integration steps.)
+    frames are saved. (In integration steps.) Default = 500.
     """
 
     restart: Parameter[bool] = Parameter(default=False)
-    """Whether this is a continuation of a previous simulation."""
+    """Whether this is a continuation of a previous simulation. Default = False."""
 
     restraint: Parameter[str | list[int]] = Parameter(default=[])
     """
@@ -102,12 +102,14 @@ class _ProductionBase(_BioSimSpaceBase, ABC):
              ions.
     Alternatively, the user can pass a list of atom indices for
     more fine-grained control. If None, then no restraints are used.
+    Default = [].
     """
 
     force_constant: Parameter[float] = Parameter(default=10.0)
     """
     The force constant for the restraint potential, in 
-    kcal_per_mol / angstrom**2
+    kcal_per_mol / angstrom**2. Default = 10.0 kcal_per_mol /
+    angstrom**2.
     """
 
     save_name: Parameter[Path] = Parameter(optional=True)

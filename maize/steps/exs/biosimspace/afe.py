@@ -120,10 +120,10 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
     """
 
     timestep: Parameter[float] = Parameter(default=2.0)
-    """The integration timestep, in fs."""
+    """The integration timestep, in fs. Default = 2.0 fs."""
 
     runtime: Parameter[float] = Parameter(default=1.0)
-    """The running time, in ns."""
+    """The running time, in ns. Default = 1.0 ns."""
 
     # Parameters
     append_to_ligand_selection: Parameter[str] = Parameter(default="")
@@ -133,7 +133,7 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
     atom selection is f'resname {ligand_resname} and not name H*'. Uses the
     mdanalysis atom selection language. For example, 'not name O*' will result
     in an atom selection of f'resname {ligand_resname} and not name H* and not
-    name O*'.
+    name O*'. Default = "".
     """
 
     receptor_selection_str: Parameter[str] = Parameter(default="protein and name CA C N")
@@ -141,7 +141,7 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
     The selection string for the atoms in the receptor to consider
     as potential anchor points. The default atom selection is
     'protein and name CA C N'. Uses the mdanalysis atom selection
-    language.
+    language. Default = 'protein and name CA C N'.
     """
 
     force_constant: Parameter[float] = Parameter(default=0.0)
@@ -149,20 +149,22 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
     The force constant to use for all restraints, in kcal mol-1 A-2 [rad-2].
     area will be converted to A-2 and exchanged for rad-2. If set to 0.0,
     the force constants are fit to fluctuations observed during the simulation.
+    Default = 0.0.
     """
 
     cutoff: Parameter[float] = Parameter(default=10.0)
     """
-    The greatest distance between ligand and receptor anchor atoms.
+    The greatest distance between ligand and receptor anchor atoms (A).
     Only affects behaviour when method == "BSS" Receptor anchors
     further than cutoff Angstroms from the closest ligand anchors will not
     be included in the search for potential anchor points.
+    Default = 10.0 A.
     """
 
     restraint_idx: Parameter[int] = Parameter(default=0)
     """
     The index of the restraint from a list of candidate restraints ordered by
-    suitability.
+    suitability. Default = 0.
     """
 
     # Outputs
@@ -365,35 +367,35 @@ class _AFEBase(_BioSimSpaceBase, ABC):
 
     # Parameters
     n_replicates: Parameter[int] = Parameter(default=5)
-    """The number of replicate calculations to run for each ligand."""
+    """The number of replicate calculations to run for each ligand. Default = 5."""
 
     lam_vals: Parameter[list[float] | pd.Series] = Parameter(default=[0.1 * i for i in range(11)])
     """
-    The lambda values to use for the alchemical free energy calculation.
+    The lambda values to use for the alchemical free energy calculation. Default = [0.0, 0.1, ..., 1.0].
     """
 
     timestep: Parameter[float] = Parameter(default=2.0)
-    """The integration timestep, in fs."""
+    """The integration timestep, in fs. Default = 2.0 fs."""
 
     runtime: Parameter[float] = Parameter(default=4.0)
-    """The running time, in ns."""
+    """The running time, in ns. Default = 4.0 ns."""
 
     temperature: Parameter[float] = Parameter(default=300.0)
-    """The temperature, in K."""
+    """The temperature, in K. Default = 300.0 K."""
 
     pressure: Parameter[float] = Parameter(default=1)
-    """The pressure, in atm."""
+    """The pressure, in atm. Default = 1 atm."""
 
     tau_t: Parameter[float] = Parameter(default=1.0)
-    """The thermostat time constant, in ps."""
+    """The thermostat time constant, in ps. Default = 1.0 ps."""
 
     report_interval: Parameter[int] = Parameter(default=200)
-    """The frequency at which statistics are recorded. (In integration steps.)"""
+    """The frequency at which statistics are recorded. (In integration steps.) Default = 200."""
 
     restart_interval: Parameter[int] = Parameter(default=1000)
     """
     The frequency at which restart configurations and trajectory frames are saved. 
-    (In integration steps.)"""
+    (In integration steps.) Default = 1000."""
 
     perturbation_type: Parameter[str] = Parameter(default="full")
     """
@@ -414,12 +416,15 @@ class _AFEBase(_BioSimSpaceBase, ABC):
 
     Currently perturubation_type != "full" is only supported by
     BioSimSpace.Process.Somd.
+
+    Default = "full".
     """
 
     dg_sign: Parameter[Literal[-1, 1]] = Parameter(default=1)
     """
     If set to -1, the sign of the free energy change will be flipped.
     This is useful when integrating ABFE stages into an entire ABFE calculation.
+    Default = 1.
     """
 
     apply_restraint_correction: Parameter[bool] = Parameter(default=False)
@@ -427,40 +432,40 @@ class _AFEBase(_BioSimSpaceBase, ABC):
     If set to True, the restraint correction will be applied to the free energy
     change. This is useful when integrating ABFE stages into an entire ABFE calculation.
     Note that the correction is for releasing the restraint to the standard state volume,
-    and its sign is reversed if dg_sign is set to -1.
+    and its sign is reversed if dg_sign is set to -1. Default = False.
     """
 
     runtime: Parameter[float] = Parameter(default=1.0)
-    """The running time, in ns."""
+    """The running time, in ns. Default = 1.0 ns."""
 
     temperature: Parameter[float] = Parameter(default=300.0)
-    """The temperature, in K."""
+    """The temperature, in K. Default = 300.0 K."""
 
     ensemble: Parameter[Ensemble] = Parameter(default=Ensemble.NPT)
-    """The ensemble to use."""
+    """The ensemble to use. Default = NPT."""
 
     pressure: Parameter[float] = Parameter(default=1)
-    """The pressure, in atm."""
+    """The pressure, in atm. Default = 1 atm."""
 
     thermostat_time_constant: Parameter[float] = Parameter(default=1.0)
-    """Time constant for thermostat coupling, in ps."""
+    """Time constant for thermostat coupling, in ps. Default = 1.0 ps."""
 
     report_interval: Parameter[int] = Parameter(default=100)
-    """The frequency at which statistics are recorded. (In integration steps.)"""
+    """The frequency at which statistics are recorded. (In integration steps.). Default = 100."""
 
     restart_interval: Parameter[int] = Parameter(default=500)
     """
     The frequency at which restart configurations and trajectory
-    frames are saved. (In integration steps.)
+    frames are saved. (In integration steps.) Default = 500.
     """
 
     restart: Parameter[bool] = Parameter(default=False)
-    """Whether this is a continuation of a previous simulation."""
+    """Whether this is a continuation of a previous simulation. Default = False."""
 
     estimator: Parameter[Literal["MBAR", "TI"]] = Parameter(default="MBAR")
     """
     The estimator to use when calculating the free energy. Can be one of
-    "MBAR" or "TI".
+    "MBAR" or "TI". Default = "MBAR".
     """
 
     # Output

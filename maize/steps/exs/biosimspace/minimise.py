@@ -44,7 +44,7 @@ class _MinimiseBase(_BioSimSpaceBase, ABC):
 
     # Parameters
     steps: Parameter[int] = Parameter(default=10_000)
-    """The maximum number of steps to perform."""
+    """The maximum number of steps to perform. Default = 10,000."""
 
     restraint: Parameter[str | list[int]] = Parameter(default=[])
     """
@@ -62,12 +62,13 @@ class _MinimiseBase(_BioSimSpaceBase, ABC):
              ions.
     Alternatively, the user can pass a list of atom indices for
     more fine-grained control. If None, then no restraints are used.
+    Default = [].
     """
 
     force_constant: Parameter[float] = Parameter(default=10.0)
     """
     The force constant for the restraint potential, in 
-    kcal_per_mol / angstrom**2
+    kcal_per_mol / angstrom**2. Default = 10.0.
     """
 
     save_name: Parameter[Path] = Parameter(optional=True)

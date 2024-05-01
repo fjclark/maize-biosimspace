@@ -115,6 +115,9 @@ def get_workflow_fn(node: Node) -> Callable[[], Workflow]:
             "python",
             "scripts",
             "save_name",
+            # Don't allow restraints to be set via CLI as this is a pain
+            "restraint",
+            "force_constant",
         ]
         flow.map(
             *[
