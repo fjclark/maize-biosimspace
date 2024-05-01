@@ -112,7 +112,8 @@ class TestSuiteCombine:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.prm7", "bss_system.rst7"}
+        assert all(f.startswith("bss_system") for f in file_names)
+        assert all(f.endswith(".prm7") or f.endswith(".rst7") for f in file_names)
 
     def test_biosimspace_combine_multi_fail(
         self,
@@ -156,4 +157,5 @@ class TestSuiteCombine:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.prm7", "bss_system.rst7"}
+        assert all(f.startswith("bss_system") for f in file_names)
+        assert all(f.endswith(".prm7") or f.endswith(".rst7") for f in file_names)

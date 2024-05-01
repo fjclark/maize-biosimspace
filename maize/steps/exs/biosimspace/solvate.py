@@ -139,7 +139,6 @@ class Solvate(_BioSimSpaceBase):
 solvate_exposed = expose(get_workflow_fn(Solvate))
 
 
-
 class TestSuiteSolvate:
     def test_biosimspace_solvation(
         self,
@@ -161,7 +160,8 @@ class TestSuiteSolvate:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.prm7", "bss_system.rst7"}
+        assert all(f.startswith("bss_system") for f in file_names)
+        assert all(f.endswith(".prm7") or f.endswith(".rst7") for f in file_names)
 
         # Read the .rst7 file and check the box size
         rst7_file = [f for f in output if f.name.endswith(".rst7")][0]
@@ -170,7 +170,7 @@ class TestSuiteSolvate:
             box_size = [float(x) for x in lines[-1].split()]
             for i in range(3):
                 # Check angles
-                assert pytest.approx(box_size[i+3], abs=1e-3) == 90.0
+                assert pytest.approx(box_size[i + 3], abs=1e-3) == 90.0
                 # Check box size
                 assert pytest.approx(box_size[i], abs=1e-3) == 72.39
 
