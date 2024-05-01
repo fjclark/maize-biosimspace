@@ -62,8 +62,9 @@ class _BioSimSpaceBase(Node, ABC):
     save_name: FileParameter[Path] = FileParameter(optional=True)
     """
     If supplied, the output files will be saved with
-    this name. E.g., if set to Path("output"), the output
-    files will be output.rst7 and output.prm7.
+    this name. E.g., if set to Path("output") (or "output"
+    through the CLI), the output files will be output.rst7
+    and output.prm7.
     """
 
     # Output

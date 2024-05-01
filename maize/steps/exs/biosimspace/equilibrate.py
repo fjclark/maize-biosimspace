@@ -4,7 +4,7 @@
 
 from abc import ABC
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 
@@ -54,7 +54,7 @@ class _EquilibrateBase(_BioSimSpaceBase, ABC):
     temperature_end: Parameter[float] = Parameter(default=300.0)
     """The ending temperature, in K. Default = 300.0 K."""
 
-    ensemble: Parameter[Ensemble] = Parameter(default=Ensemble.NVT)
+    ensemble: Parameter[Literal["NVT", "NPT"]] = Parameter(default="NVT")
     """The ensemble to use for the equilibration. Default = NVT."""
 
     pressure: Parameter[float] = Parameter(default=1)
@@ -113,7 +113,7 @@ class _EquilibrateBase(_BioSimSpaceBase, ABC):
 
         pressure = (
             None
-            if self.ensemble.value == Ensemble.NVT
+            if Ensemble(self.ensemble.value) == Ensemble.NVT
             else self.pressure.value * BSS.Units.Pressure.atm
         )
 

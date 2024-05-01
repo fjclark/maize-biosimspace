@@ -235,7 +235,7 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
 
         pressure = (
             None
-            if self.ensemble.value == Ensemble.NVT
+            if Ensemble(self.ensemble.value) == Ensemble.NVT
             else self.pressure.value * BSS.Units.Pressure.atm
         )
 
@@ -441,7 +441,7 @@ class _AFEBase(_BioSimSpaceBase, ABC):
     temperature: Parameter[float] = Parameter(default=300.0)
     """The temperature, in K. Default = 300.0 K."""
 
-    ensemble: Parameter[Ensemble] = Parameter(default=Ensemble.NPT)
+    ensemble: Parameter[Literal["NVT", "NPT"]] = Parameter(default="NVT")
     """The ensemble to use. Default = NPT."""
 
     pressure: Parameter[float] = Parameter(default=1)
