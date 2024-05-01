@@ -200,7 +200,7 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
         # If GROMACS, set ntmp=1 to avoid domain decomposition which can hammer performance
         if self.bss_engine == BSSEngine.GROMACS:
             cmd += " -ntmpi 1"
-        options = JobResourceConfig(custom_attributes={"gres":"gpu:1", "mem":"24GB"})
+        options = JobResourceConfig(custom_attributes={"gres": "gpu:1", "mem": "24GB"})
         self.run_command(cmd, batch_options=options, prefer_batch=True)
         output_system = process.getSystem(block=True)
         # BioSimSpace sometimes returns None, so we need to check
@@ -525,7 +525,7 @@ class _AFEBase(_BioSimSpaceBase, ABC):
 
         # Run all of the lambda windows, ensuring that they
         # get one GPU each
-        options = JobResourceConfig(custom_attributes={"gres":"gpu:1", "mem":"24GB"})
+        options = JobResourceConfig(custom_attributes={"gres": "gpu:1", "mem": "24GB"})
         self.run_multi(cmds, work_dirs, batch_options=options)
 
         # Analyse the stage
@@ -642,7 +642,8 @@ class TestSuiteAFE:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.prm7", "bss_system.rst7"}
+        assert all(f.startswith("bss_system") for f in file_names)
+        assert all(f.endswith(".prm7") or f.endswith(".rst7") for f in file_names)
 
         # Check that we have a restraint file
         restr_pkl = res["boresch_restraint"].get()

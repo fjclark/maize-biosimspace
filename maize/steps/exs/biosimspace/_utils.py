@@ -105,10 +105,28 @@ def get_workflow_fn(node: Node) -> Callable[[], Workflow]:
         flow = Workflow(name=node.__name__)
         bss_node = flow.add(node)
         # We have to connect the output to something
-        retu = flow.add(Return[list[Path]], name="Return")
+        retu = flow.add(Return[tuple[Path, Path]], name="Return")
         flow.connect(bss_node.out, retu.inp)
         flow.map(bss_node.inp)
-        flow.map(*bss_node.parameters.values())
+        filter_parameters = [
+            "batch_options",
+            "commands",
+            "modules",
+            "python",
+            "scripts",
+            "save_name",
+        ]
+        flow.map(
+            *[
+                param
+                for param in bss_node.parameters.values()
+                if param.name not in filter_parameters
+            ]
+        )
+
+        # Make sure that the save name is always set when run through the CLI
+        # TODO: Figure out why this fails to set the default for the CLI
+        flow.combine_parameters(bss_node.save_name, default=f"{node.__name__.lower()}_output")
 
         return flow
 

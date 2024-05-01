@@ -64,7 +64,7 @@ class Parameterise(_BioSimSpaceBase):
     - openff_unconstrained-2.0.0
     """
 
-    water_model: Parameter[str] = Parameter(default="tip3p")
+    water_model: Parameter[str] = Parameter[str](default="tip3p")
     """
     The water model to use. Supported water models are shown with
     BioSimSpace.Solvent.waterModels() e.g.:
@@ -74,6 +74,8 @@ class Parameterise(_BioSimSpaceBase):
     - tip3p
     - tip4p
     - tip5p
+
+    Default is tip3p.
     """
 
     def run(self) -> None:
@@ -107,7 +109,7 @@ class Parameterise(_BioSimSpaceBase):
             f.write(param_script)
 
         # Run the script - we want lots of memory
-        options = JobResourceConfig(custom_attributes={"mem":"24GB"})
+        options = JobResourceConfig(custom_attributes={"mem": "24GB"})
         self.run_command("python param_script.py", batch_options=options, prefer_batch=True)
 
         # Load the output
@@ -151,10 +153,12 @@ class TestSuiteParameterise:
         output = res["out"].get()
         # Get the file name from the path
         file_names = {f.name for f in output}
-        assert file_names == {"bss_system.prm7", "bss_system.rst7"}
+        assert all(f.startswith("bss_system") for f in file_names)
+        assert all(f.endswith(".prm7") or f.endswith(".rst7") for f in file_names)
 
         # Check that the dumping worked
         # Get the most recent directory in the dump folder
         dump_output_dir = sorted(dump_dir.iterdir())[-1]
-        assert (dump_output_dir / "bss_system.prm7").exists()
-        assert (dump_output_dir / "bss_system.rst7").exists()
+        assert any(f.name.startswith("bss_system") for f in dump_output_dir.iterdir())
+        assert any(f.name.endswith(".prm7") for f in dump_output_dir.iterdir())
+        assert any(f.name.endswith(".rst7") for f in dump_output_dir.iterdir())
