@@ -20,7 +20,7 @@ jobs:
         run: |
           sphinx-build docs _build
       - name: Create .nojekyll file
-        run: touch _build/.nojekyll
+        run: touch .nojekyll
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
