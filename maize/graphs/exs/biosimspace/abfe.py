@@ -20,11 +20,15 @@ from maize.steps.exs.biosimspace import (
     MinimiseGromacs,
     Parameterise,
     ProductionGromacs,
-    SaveAFEResults,
+    SaveAFEResult,
     Solvate,
     StageType,
 )
-from maize.steps.exs.biosimspace._utils import IsomerToSDF
+from maize.steps.exs.biosimspace._utils import (
+    IsomerToSDF,
+    SdfPathtoIsomerList,
+    make_inputs_required,
+)
 from maize.steps.io import LoadData, Return
 from maize.steps.plumbing import Accumulate, Copy, Scatter
 from maize.utilities.chem.chem import Isomer
@@ -40,9 +44,9 @@ __all__ = [
 ]
 
 
-class AbsoluteBindingFreeEnergySingleRepeat(Graph):
+class AbsoluteBindingFreeEnergy(Graph):
     """
-    A class for running a single absolute binding free energy calculation
+    A class for running an absolute binding free energy calculation
     using SOMD through BioSimSpace. This requires parameterised and equilibrated
     input structures, and performs short production simulations followed by
     ABFE calculations.
@@ -64,15 +68,15 @@ class AbsoluteBindingFreeEnergySingleRepeat(Graph):
     # gro87, grotop, prm7, rst rst7
     # """
 
-    inp_bound: Input[list[Path]] = Input(optional=True)
-    """
-    Paths to equilibrated input files for the bound leg. A
-    topology and a coordinate file are required. These can
-    be in any of the formats given by BSS.IO.fileFormats()
-    e.g.:
-    
-    gro87, grotop, prm7, rst rst7
-    """
+    # inp_bound: Input[list[Path]] = Input(optional=True)
+    # """
+    # Paths to equilibrated input files for the bound leg. A
+    # topology and a coordinate file are required. These can
+    # be in any of the formats given by BSS.IO.fileFormats()
+    # e.g.:
+
+    # gro87, grotop, prm7, rst rst7
+    # """
 
     # Parameters
     lam_vals: Parameter[dict[LegType, [StageType, list[float]]]] = Parameter(
@@ -233,6 +237,7 @@ class AbsoluteBindingFreeEnergySingleRepeat(Graph):
             "tau_t",
             "thermostat_time_constant",
             "timestep",
+            "n_replicates",
         ]
         for param_name in param_names_to_map:
             self.combine_parameters(
@@ -241,6 +246,9 @@ class AbsoluteBindingFreeEnergySingleRepeat(Graph):
 
         # Map the overall inputs
         self.out = self.map_port(collect_results.out)
+
+        # Make all inputs required so that we can do things like looping
+        make_inputs_required(self, input_names=["inp_bound", "inp_free", "inp"])
 
 
 class AbsoluteBindingFreeEnergyMultiRepeat(Graph):
@@ -265,7 +273,7 @@ class AbsoluteBindingFreeEnergyMultiRepeat(Graph):
         # Add all the repeat ABFE nodes
         abfe_subgraph = self.add(
             parallel(
-                AbsoluteBindingFreeEnergySingleRepeat,
+                AbsoluteBindingFreeEnergy,
                 n_branches=self.n_repeats.value,
                 inputs=[],
                 constant_inputs=["inp_bound", "inp_free"],
@@ -284,10 +292,30 @@ class AbsoluteBindingFreeEnergyMultiRepeat(Graph):
         self.out = self.map_port(accumulate_results.out, name="out")
 
 
-class AbsoluteBindingFreeEnergyMultiWithPrep(Graph):
+class AbsoluteBindingFreeEnergyWithPrep(Graph):
     """
-    A class for running multiple repeat absolute binding free energy calculations
+    A class for running absolute binding free energy calculations
     from unparameterised input structures.
+    """
+
+    inp_free: Input[list[Path]] = Input()
+    """
+    Paths to equilibrated input files for the free leg. A
+    topology and a coordinate file are required. These can
+    be in any of the formats given by BSS.IO.fileFormats()
+    e.g.:
+
+    gro87, grotop, prm7, rst rst7
+    """
+
+    inp_bound: Input[list[Path]] = Input()
+    """
+    Paths to equilibrated input files for the bound leg. A
+    topology and a coordinate file are required. These can
+    be in any of the formats given by BSS.IO.fileFormats()
+    e.g.:
+
+    gro87, grotop, prm7, rst rst7
     """
 
     def build(self) -> None:
@@ -300,10 +328,10 @@ class AbsoluteBindingFreeEnergyMultiWithPrep(Graph):
         sys_prep_bound = self.add(SystemPreparationBound, name="SystemPreparationBound")
 
         # Run repeats of ABFE calculations
-        abfe_calc = self.add(AbsoluteBindingFreeEnergyMultiRepeat, name="AbsoluteBindingFreeEnergy")
+        abfe_calc = self.add(AbsoluteBindingFreeEnergy, name="AbsoluteBindingFreeEnergy")
 
         # Save the ABFE results
-        save_results = self.add(SaveAFEResults, name="SaveAFEResults")
+        save_results = self.add(SaveAFEResult, name="SaveAFEResult")
 
         # Connect the nodes
         self.connect(copy_inp.out, sys_prep_free.inp)
@@ -337,10 +365,13 @@ class AbsoluteBindingFreeEnergyMultiWithPrep(Graph):
         # self.combine_parameters(copy_inp.inp, name="lig_sdf_path")
         self.inp = self.map_port(copy_inp.inp, name="inp")
 
+        # Make inputs required so that we can loop the nodes
+        make_inputs_required(self, input_names=["inp_free", "inp_bound", "inp"])
+
 
 class AbsoluteBindingFreeEnergyMultiIsomer(Graph):
     """
-    A subgraph for running multiple repeat absolute binding free energy calculations
+    A subgraph for running absolute binding free energy calculations
     on a set of isomers.
     """
 
@@ -357,15 +388,15 @@ class AbsoluteBindingFreeEnergyMultiIsomer(Graph):
         scatter = self.add(Scatter[Isomer], name="ScatterIsomers")
 
         # Convert the input isomer paths to sdfs
-        iso_to_sdf_paths = self.add(IsomerToSDF, name="IsomerToSDF", loop=False)
+        iso_to_sdf_paths = self.add(IsomerToSDF, name="IsomerToSDF", loop=True)
 
         # TODO: Figure out why adding loop=True causes nodes to run with no
         # input, even if
         # Run the ABFE calculations on each isomer
         abfe_calc = self.add(
-            AbsoluteBindingFreeEnergyMultiWithPrep,
+            AbsoluteBindingFreeEnergyWithPrep,
             name="AbsoluteBindingFreeEnergy",
-            loop=False,
+            loop=True,
         )
 
         # Return the scored isomers
@@ -389,16 +420,20 @@ def get_abfe_multi_isomer_workflow() -> Workflow:
     of isomers.
     """
 
-    flow = Workflow(name="absolute_binding_free_energy_multi_isomer")
+    flow = Workflow(name="absolute_binding_free_energy_multi_isomer", cleanup_temp=False)
 
-    load_data = flow.add(LoadData[list[Isomer]], name="LoadData")
+    load_data = flow.add(LoadData[Path], name="LoadSdfPath")
+
+    # Convert to isomers
+    sdf_to_isomers = flow.add(SdfPathtoIsomerList, name="SdfPathtoIsomerList")
 
     abfe_multi_isomer = flow.add(
         AbsoluteBindingFreeEnergyMultiIsomer, name="AbsoluteBindingFreeEnergy"
     )
 
     # Connect the nodes/ subgraphs
-    flow.connect(load_data.out, abfe_multi_isomer.inp)
+    flow.connect(load_data.out, sdf_to_isomers.inp)
+    flow.connect(sdf_to_isomers.out, abfe_multi_isomer.inp)
 
     # Map the inputs/ parameters
     flow.map(*abfe_multi_isomer.parameters.values())
@@ -418,8 +453,8 @@ def get_abfe_no_prep_workflow() -> Workflow:
 
     flow = Workflow(name="absolute_binding_free_energy_no_prep")
 
-    abfe_calc = flow.add(AbsoluteBindingFreeEnergyMultiRepeat, name="AbsoluteBindingFreeEnergy")
-    save_results = flow.add(SaveAFEResults, name="SaveAFEResults")
+    abfe_calc = flow.add(AbsoluteBindingFreeEnergy, name="AbsoluteBindingFreeEnergy")
+    save_results = flow.add(SaveAFEResult, name="SaveAFEResult")
 
     # Connect the nodes/ subgraphs
     flow.connect(abfe_calc.out, save_results.inp)
@@ -429,7 +464,7 @@ def get_abfe_no_prep_workflow() -> Workflow:
     flow.combine_parameters(abfe_calc.inp_free, name="inp_free")
     flow.map(*abfe_calc.parameters.values())
     # TODO: Figure out why supplying a default value for the save_results.file parameter
-    # doesn't work (still needs to be supplied for CLI if no default is given in SaveAFEResults)
+    # doesn't work (still needs to be supplied for CLI if no default is given in SaveAFEResult)
     flow.combine_parameters(save_results.file, name="results_file_name")
 
     return flow
@@ -446,9 +481,7 @@ def get_abfe_with_prep_workflow() -> Workflow:
     flow = Workflow(name="absolute_binding_free_energy")
 
     # Run setup and repeats of ABFE calculations
-    abfe_with_prep = flow.add(
-        AbsoluteBindingFreeEnergyMultiWithPrep, name="AbsoluteBindingFreeEnergy"
-    )
+    abfe_with_prep = flow.add(AbsoluteBindingFreeEnergyWithPrep, name="AbsoluteBindingFreeEnergy")
 
     # Map the inputs/ parameters
     flow.map(*abfe_with_prep.parameters.values())

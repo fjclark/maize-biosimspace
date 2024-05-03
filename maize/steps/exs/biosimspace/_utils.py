@@ -4,11 +4,12 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+from maize.core.component import Component
 from maize.core.interface import Input, Output
 from maize.core.node import Node
 from maize.core.workflow import Workflow, expose
 from maize.steps.io import Return
-from maize.utilities.chem import Isomer
+from maize.utilities.chem import Isomer, load_sdf_library
 
 from .enums import BSSEngine
 
@@ -302,3 +303,61 @@ class IsomerToSDF(Node):
 
         # Send the path to the output
         self.out.send(sdf_path)
+
+
+class SdfPathtoIsomerList(Node):
+    """
+    Convert a path to an SDF file to a list of Isomer objects.
+    """
+
+    # Input
+    inp: Input[Path] = Input()
+    """
+    Path to the input SDF file.
+    """
+
+    out: Output[list[Isomer]] = Output()
+    """
+    List of Isomer objects.
+    """
+
+    def run(self) -> None:
+
+        # Get the sdf input
+        sdf_path = self.inp.receive()
+
+        # Load the isomers
+        isomer_collections = load_sdf_library(sdf_path, split_strategy="none")
+
+        # Convert to lists of isomers since we've read in all the sdfs individually
+        isomers = [
+            isomer
+            for isomer_collection in isomer_collections
+            for isomer in isomer_collection.molecules
+        ]
+
+        # Send the isomers to the output
+        self.out.send(isomers)
+
+
+def make_inputs_required(component: Component, input_names: list[str] = ["inp"]) -> None:
+    """
+    Recursively make all requested inputs required for component and contained
+    components.
+
+    Parameters
+    ----------
+    component : Component
+        The node to make inputs required for.
+
+    input_names : list[str], optional
+        The names of the inputs to make required. Default is ["inp"].
+    """
+    if hasattr(component, "inputs"):
+        for input_name in input_names:
+            if input_name in component.inputs:
+                component.inputs[input_name].optional = False
+
+    if hasattr(component, "nodes"):
+        for node in component.nodes.values():
+            make_inputs_required(node, input_names)

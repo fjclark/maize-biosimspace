@@ -41,19 +41,6 @@ class _ProductionBase(_BioSimSpaceBase, ABC):
     L. O. Hedges et al., LiveCoMS, 2023, 5, 2375–2375.
     """
 
-    # Input
-    # TODO: This shouldn't be necessary as defined in the base class.
-    # However, type info gets messed up if we remove this.
-    # Figure out how to remove this
-    inp: Input[list[Path]] = Input(optional=True)
-    """
-    Paths to system input files. A topology and a coordinate
-    file are required. These can be in any of the formats
-    given by BSS.IO.fileFormats() e.g.:
-    
-    gro87, grotop, prm7, rst rst7
-    """
-
     # Parameters
     timestep: Parameter[float] = Parameter(default=2.0)
     """The integration timestep, in fs. Default = 2.0 fs."""

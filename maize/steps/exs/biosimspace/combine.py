@@ -33,7 +33,7 @@ class Combine(_BioSimSpaceBase):
     bss_engine = BSSEngine.NONE
 
     # Input
-    inp: MultiInput[list[Path | list[Path]]] = MultiInput()
+    inp: MultiInput[list[Path] | tuple[Path, Path]] = MultiInput()
     """
     A list of paths to system input files. These can be in any of the formats
     given by BSS.IO.fileFormats():

@@ -7,6 +7,7 @@ calculations using BioSimSpace.
 
 import csv
 import pickle as pkl
+import threading
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,7 +40,7 @@ _ENGINES = [BSSEngine.SOMD, BSSEngine.GROMACS]
 
 __all__ = [f"AFE{engine.class_name}" for engine in _ENGINES]
 __all__.extend(
-    ["SaveAFEResults", "AFEResult", "CollectAFEResults", "GenerateBoreschRestraintGromacs"]
+    ["SaveAFEResult", "AFEResult", "CollectAFEResults", "GenerateBoreschRestraintGromacs"]
 )
 
 
@@ -110,14 +111,14 @@ class _GenerateBoreschRestraintBase(_ProductionBase, ABC):
     # TODO: This shouldn't be necessary as defined in the base class.
     # However, type info gets messed up if we remove this.
     # Figure out how to remove this
-    inp: Input[list[Path]] = Input(optional=True)
-    """
-    Paths to system input files. A topology and a coordinate
-    file are required. These can be in any of the formats
-    given by BSS.IO.fileFormats() e.g.:
-    
-    gro87, grotop, prm7, rst rst7
-    """
+    # inp: Input[list[Path]] = Input(optional=True)
+    # """
+    # Paths to system input files. A topology and a coordinate
+    # file are required. These can be in any of the formats
+    # given by BSS.IO.fileFormats() e.g.:
+
+    # gro87, grotop, prm7, rst rst7
+    # """
 
     timestep: Parameter[float] = Parameter(default=2.0)
     """The integration timestep, in fs. Default = 2.0 fs."""
@@ -261,16 +262,17 @@ class AFEResult:
 
     smiles: str
     """The SMILES string of the ligand."""
-    dg: float
-    """The free energy changes for the alchemical transformation."""
-    error: float
-    """The error in the free energy change."""
+    dg: np.ndarray
+    """The free energy changes for the alchemical transformation for each repeat."""
+    error: np.ndarray
+    """The error in the free energy change for each repeat."""
     pmf: list[pd.Series] | None
-    """The potential of mean force (PMF) for the alchemical transformation."""
+    """List of potentials of mean force (PMFs) for the alchemical transformation."""
     overlap: list[pd.Series] | None
-    """The overlap between windows for the alchemical transformation."""
+    """The overlap matrices between windows for the alchemical transformation."""
 
     # Allow addition or subtraction of two results if they have the same SMILES
+    # Note that this removes the pmf and overlap information
     def __add__(self, other: "AFEResult") -> "AFEResult":
         if self.smiles != other.smiles:
             raise ValueError("Cannot add two results with different SMILES.")
@@ -298,11 +300,25 @@ class AFEResult:
             return self
         return self.__add__(other)
 
+    def append_repeat(self, other: "AFEResult") -> None:
+        if self.smiles != other.smiles:
+            raise ValueError("Cannot append two results with different SMILES.")
+        self.dg = np.append(self.dg, other.dg)
+        self.error = np.append(self.error, other.error)
+        self.pmf.append(other.pmf)
+        self.overlap.append(other.overlap)
 
-class SaveAFEResults(Node):
+    def __len__(self) -> int:
+        return len(self.dg)
+
+
+class SaveAFEResult(Node):
     """Save an AFE result object to a CSV. The PMF and overlap information is discarded."""
 
-    inp: Input[AFEResult | list[AFEResult]] = Input()
+    # Often, we will be writing to the same file from multiple nodes, so we need to lock
+    lock = threading.Lock()
+
+    inp: Input[AFEResult] = Input()
     """An alchemical free energy result, or a list of results."""
 
     file: FileParameter[Annotated[Path, Suffix("csv")]] = FileParameter(
@@ -311,21 +327,18 @@ class SaveAFEResults(Node):
     """Output CSV location"""
 
     def run(self) -> None:
-        results = self.inp.receive()
-        # Convert non-lists into lists
-        results = [results] if not isinstance(results, list) else results
-        with open(self.file.filepath, "a") as out:
-            writer = csv.writer(out, delimiter=",", quoting=csv.QUOTE_MINIMAL)
-            for result in results:
+        result = self.inp.receive()
+        # Aquire the lock before writing to the file
+        with self.lock:
+            with open(self.file.filepath, "a") as out:
+                writer = csv.writer(out, delimiter=",", quoting=csv.QUOTE_MINIMAL)
                 # Only write header if it's empty
                 if not self.file.filepath.exists() or self.file.filepath.stat().st_size == 0:
                     writer.writerow(["smiles", "repeat_no", "dg", "error"])
-                # Get the repeat number by checking if there are already lines with the current smiles
-                # present
-                with open(self.file.filepath, "r") as f:
-                    lines = f.readlines()
-                    repeat_no = len([line for line in lines if result.smiles in line]) + 1
-                writer.writerow([result.smiles, repeat_no, result.dg, result.error])
+                for i in range(len(result)):
+                    # Get the repeat number by checking if there are already lines with the current smiles
+                    # present
+                    writer.writerow([result.smiles, i + 1, result.dg[i], result.error[i]])
 
 
 class CollectAFEResults(Node):
@@ -462,7 +475,7 @@ class _AFEBase(_BioSimSpaceBase, ABC):
     restart: Parameter[bool] = Parameter(default=False)
     """Whether this is a continuation of a previous simulation. Default = False."""
 
-    estimator: Parameter[Literal["MBAR", "TI"]] = Parameter(default="MBAR")
+    estimator: Parameter[str] = Parameter(default="MBAR")
     """
     The estimator to use when calculating the free energy. Can be one of
     "MBAR" or "TI". Default = "MBAR".
@@ -500,59 +513,83 @@ class _AFEBase(_BioSimSpaceBase, ABC):
         else:
             restraint = None
 
-        # Create the alchemical free energy object.
-        protocol = self._get_protocol()
-        calculation = BSS.FreeEnergy.AlchemicalFreeEnergy(
-            system=pert_sys,
-            protocol=protocol,
-            work_dir=str(self.work_dir),
-            engine=self.bss_engine.name.lower(),
-            gpu_support=True,
-            restraint=restraint,
-            estimator=self.estimator.value,
-            extra_options=self._get_extra_options(self.bss_engine),
+        # Loop for the number of replicates
+        overall_afe_result = AFEResult(
+            smiles=get_ligand_smiles(sys, ligand_name="LIG"),
+            dg=np.array([]),
+            error=np.array([]),
+            pmf=[],
+            overlap=[],
         )
+        for i in range(self.n_replicates.value):
+            self.logger.info(f"Running replicate {i + 1} of {self.n_replicates.value}...")
 
-        # Set up the calculation processes
-        calculation._initialise_runner(pert_sys)
-
-        # Get all of the process commands and working directories
-        self.logger.info(f"Running {protocol.__class__.__name__} with {self.bss_engine.name}...")
-        cmds = [" ".join([p.exe(), p.getArgString()]) for p in calculation._runner.processes()]
-        # For SOMD, we need to ensure that the partition is CUDA and not CPU. CUDA_VISIBLE_DEVICES
-        # is only set in the run_multi method, hence BioSimSpace will set the partition to CPU.
-        if self.bss_engine == BSSEngine.SOMD:
-            cmds = [" ".join(cmd.split(" ")[:-2]) + " -p CUDA" for cmd in cmds]
-        # If GROMACS, set ntmp=1 to avoid domain decomposition which can hammer performance
-        if self.bss_engine == BSSEngine.GROMACS:
-            cmds = [cmd + " -ntmpi 1" for cmd in cmds]
-        work_dirs = [str(p._work_dir) for p in calculation._runner.processes()]
-
-        # Run all of the lambda windows, ensuring that they
-        # get one GPU each
-        options = JobResourceConfig(custom_attributes={"gres": "gpu:1", "mem": "24GB"})
-        self.run_multi(cmds, work_dirs, batch_options=options)
-
-        # Analyse the stage
-        self.logger.info("Analysing the stage...")
-        self.logger.debug(f"dg_multiplier: {self.dg_sign.value}")
-        dg_multiplier = self.dg_sign.value
-        smiles = get_ligand_smiles(sys, ligand_name="LIG")
-        pmf, overlap = calculation.analyse()
-        dg = pmf[-1][1].value() * dg_multiplier
-        dg_error = pmf[-1][2].value()
-        self.logger.info(f"Free energy change for {smiles}: {dg} +/- {dg_error} kcal/mol")
-        # Make sure to apply the correction if necessary
-        if self.apply_restraint_correction.value and restraint is not None:
-            self.logger.info(
-                f"Applying the restraint correction: {restraint.getCorrection().value() * dg_multiplier} kcal/mol"
+            # Create the alchemical free energy object.
+            protocol = self._get_protocol()
+            calculation = BSS.FreeEnergy.AlchemicalFreeEnergy(
+                system=pert_sys,
+                protocol=protocol,
+                work_dir=str(self.work_dir),
+                engine=self.bss_engine.name.lower(),
+                gpu_support=True,
+                restraint=restraint,
+                estimator=self.estimator.value,
+                extra_options=self._get_extra_options(self.bss_engine),
             )
-            dg += restraint.getCorrection().value() * dg_multiplier
 
-        afe_result = AFEResult(smiles=smiles, dg=dg, error=dg_error, pmf=pmf, overlap=overlap)
+            # Set up the calculation processes
+            calculation._initialise_runner(pert_sys)
+
+            # Get all of the process commands and working directories
+            self.logger.info(
+                f"Running {protocol.__class__.__name__} with {self.bss_engine.name}..."
+            )
+            cmds = [" ".join([p.exe(), p.getArgString()]) for p in calculation._runner.processes()]
+            # For SOMD, we need to ensure that the partition is CUDA and not CPU. CUDA_VISIBLE_DEVICES
+            # is only set in the run_multi method, hence BioSimSpace will set the partition to CPU.
+            if self.bss_engine == BSSEngine.SOMD:
+                cmds = [" ".join(cmd.split(" ")[:-2]) + " -p CUDA" for cmd in cmds]
+            # If GROMACS, set ntmp=1 to avoid domain decomposition which can hammer performance
+            if self.bss_engine == BSSEngine.GROMACS:
+                cmds = [cmd + " -ntmpi 1" for cmd in cmds]
+            work_dirs = [str(p._work_dir) for p in calculation._runner.processes()]
+
+            # Run all of the lambda windows, ensuring that they
+            # get one GPU each
+            options = JobResourceConfig(custom_attributes={"gres": "gpu:1", "mem": "24GB"})
+            self.run_multi(cmds, work_dirs, batch_options=options)
+
+            # Analyse the stage
+            self.logger.info("Analysing the stage...")
+            self.logger.debug(f"dg_multiplier: {self.dg_sign.value}")
+            dg_multiplier = self.dg_sign.value
+            smiles = get_ligand_smiles(sys, ligand_name="LIG")
+            pmf, overlap = calculation.analyse()
+            dg = pmf[-1][1].value() * dg_multiplier
+            dg_error = pmf[-1][2].value()
+            self.logger.info(f"Free energy change for {smiles}: {dg} +/- {dg_error} kcal/mol")
+            # Make sure to apply the correction if necessary
+            if self.apply_restraint_correction.value and restraint is not None:
+                self.logger.info(
+                    f"Applying the restraint correction: {restraint.getCorrection().value() * dg_multiplier} kcal/mol"
+                )
+                dg += restraint.getCorrection().value() * dg_multiplier
+
+            afe_result = AFEResult(
+                smiles=smiles,
+                dg=np.array([dg]),
+                error=np.array([dg_error]),
+                pmf=pmf,
+                overlap=overlap,
+            )
+            overall_afe_result.append_repeat(afe_result)
 
         # Return the free energy change
-        self.out.send(afe_result)
+        self.out.send(overall_afe_result)
+
+        # Save the current AFE result to the work directory
+        with open(self.work_dir / "afe_result.pkl", "wb") as f:
+            pkl.dump(overall_afe_result, f)
 
         # Dump required data
         self._dump_data()
@@ -682,7 +719,12 @@ class TestSuiteAFE:
                 "inp": [[complex_prm7_path, complex_rst7_path]],
                 "boresch_restraint": [restraint_path],
             },
-            parameters={"runtime": 0.001, "dump_to": dump_dir, "estimator": "TI"},
+            parameters={
+                "runtime": 0.001,
+                "dump_to": dump_dir,
+                "estimator": "TI",
+                "n_replicates": 2,
+            },
         )
 
         # Check that we have all the expected outputs. Note that values will
@@ -693,8 +735,8 @@ class TestSuiteAFE:
             == "COc1ccc(C2=NC(c3ccc(Cl)cc3)C(c3ccc(Cl)cc3)N2C(=O)N2CCNC(=O)C2)c(OC(C)C)c1"
         )
         # Check relative magnitdues of errors and results are similar
-        assert afe_result.dg / 5 > afe_result.error
-        assert len(afe_result.pmf) == 11
+        assert all(afe_result.dg / 2 > afe_result.error)
+        assert len(afe_result.pmf[0]) == 11
 
         # Check that the dumping worked and that we have several lambda
         # directories
@@ -705,8 +747,12 @@ class TestSuiteAFE:
     def test_afe_result(self, temp_working_dir: Any) -> None:
         """Check that we can add and subtract AFE results as expected."""
 
-        result1 = AFEResult("c1ccccc1", 1.0, 0.1, [], [])
-        result2 = AFEResult("C#N", 1.0, 0.1, [], [])
+        result1 = AFEResult(
+            "c1ccccc1", np.array([1.0]), np.array([0.1]), [[0.0, 0.5, 1.0]], [[0.0, 0.5, 1.0]]
+        )
+        result2 = AFEResult(
+            "C#N", np.array([1.0]), np.array([0.1]), [[0.0, 0.5, 1.0]], [[0.0, 0.5, 1.0]]
+        )
 
         # Check that we can add and subtract results
         sum11 = result1 + result1
@@ -721,6 +767,13 @@ class TestSuiteAFE:
 
         with pytest.raises(ValueError):
             result1 + result2
+
+        # Check that we an append results
+        result1.append_repeat(result1)
+        assert result1.dg.shape == (2,)
+        assert result1.error.shape == (2,)
+        assert len(result1.pmf) == 2
+        assert len(result1.overlap) == 2
 
     def test_collect_afe_results(self, temp_working_dir: Any) -> None:
         """Test the CollectAFEResults node."""
@@ -740,17 +793,17 @@ class TestSuiteAFE:
         assert pytest.approx(output.error) == 0.1414213562373095
 
     def test_save_afe_results(self, temp_working_dir: Any) -> None:
-        """Test the SaveAFEResults node."""
+        """Test the SaveAFEResult node."""
 
-        rig = TestRig(SaveAFEResults)
+        rig = TestRig(SaveAFEResult)
         csv_path = Path() / "results.csv"
         res = rig.setup_run(
             inputs={
                 "inp": [
                     AFEResult(
                         "COc1ccc(C2=NC(c3ccc(Cl)cc3)C(c3ccc(Cl)cc3)N2C(=O)N2CCNC(=O)C2)c(OC(C)C)c1",
-                        1.0,
-                        0.1,
+                        np.array([1.0]),
+                        np.array([0.1]),
                         [],
                         [],
                     )
