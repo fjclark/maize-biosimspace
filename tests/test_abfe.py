@@ -102,12 +102,11 @@ def test_abfe_from_isomers(
     # generated
     abfe_multi_isomer_exposed()
     assert save_name.exists()
-    # Check that free energies are in sane range
+    # Check that free energies are in sane range, even for very short runs
     with open(save_name, "r") as f:
         lines = f.readlines()
         for line in lines[1:]:
-            assert -10 < float(line.split(",")[2]) < -1
+            assert -20 < float(line.split(",")[2]) < 0
             assert float(line.split(",")[3]) < 3
         # For two ligaands with two replicates plus header
         assert len(lines) == 5
-        breakpoint()
