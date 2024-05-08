@@ -91,7 +91,7 @@ _COLORS = {
 }
 
 html_title = "maize biosimspace"
-html_logo = "maize-contrib-logo.svg"
+html_logo = "maize-bss-logo.png"
 html_theme = "furo"
 html_theme_options = {
     "sidebar_hide_name": True,

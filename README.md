@@ -1,6 +1,6 @@
-# maize-biosimspace
+<img src="docs/maize-bss-logo.png", width="500">
 
-This is a [*namespace package*](https://packaging.python.org/en/latest/guides/packaging-namespace-packages/) for [BioSimSpace](https://biosimspace.openbiosim.org/) nodes and subgraphs for [maize](https://github.com/MolecularAI/maize).
+*maize-biosimspace* is a [*namespace package*](https://packaging.python.org/en/latest/guides/packaging-namespace-packages/) for [BioSimSpace](https://biosimspace.openbiosim.org/) nodes and subgraphs for [maize](https://github.com/MolecularAI/maize).
 
 Installation
 ------------
