@@ -8,7 +8,6 @@ __pycache__
 .*_cache
 coverage
 /test-config.toml
-_build
 test
 tmp
 testing.ipynb
