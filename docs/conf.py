@@ -28,6 +28,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
     "nbsphinx",
+    "sphinx.ext.githubpages",
 ]
 
 autosummary_generate = True
