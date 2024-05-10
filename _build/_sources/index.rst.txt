@@ -10,9 +10,18 @@ maize-biosimspace
 .. toctree::
    :hidden:
    :maxdepth: 1
-   :caption: Examples
+   :caption: Setup
 
-   production-md
+   installation
+   configuration
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Tutorials
+
+   cli_tutorials
+   python_tutorials
 
 .. toctree::
    :hidden:
@@ -29,37 +38,37 @@ maize-biosimspace
    Steps <https://molecularai.github.io/maize/docs/steps>
    Maize <https://molecularai.github.io/maize>
 
-Installation
-------------
-To install, simply clone this repository and run:
+Quick Start
+-----------
+Clone the repository and install:
 
 .. code-block:: bash
 
+   git clone https://github.com/fjclark/maize-biosimspace.git
+   cd maize-biosimspace
    mamba env create -f env-users.yml
    mamba activate maize-biosimspace
    pip install --no-deps ./
 
-If you want to keep up-to-date with the latest changes to the core, clone `maize <https://github.com/MolecularAI/maize>`_, switch to the directory, and run (in the same conda environment):
+Ensure that the required AMBER, GROMACS, and NAMD executables are available in your environment if you plan to use the relevant nodes.
+
+Many maize-biosimspace workflows will now be available through CLIs. Try typing `bss_` and hitting tab to list them. To see the options for each, type e.g.
 
 .. code-block:: bash
 
-   pip install --no-deps ./
+   bss_parameterise -h
 
-If you plan on developing, you should use ``env-dev.yml`` instead and use the ``-e`` flag for ``pip``.
+To run production 0.1 ns of production MD on a protein-ligand complex using GROMACS, dumping all of the intermediate files to the current directory:
 
-Configuration
--------------
-Each step documentation will contain information on how to setup and run the node, as well as install the required dependencies. Dependencies can be managed in several ways, depending on the node and workflow you are running:
+.. code-block:: bash
 
-* Through a ``module`` system:
+   mkdir gmx_md_example
+   cd gmx_md_example
+   cp ../tests/data/complex.* .
+   bss_production_gromacs --inp complex.prm7 complex.rst7 --runtime 0.1 --save_name gmx_md_out --dump_to .
 
-  Specify a module providing an executable in the ``config.toml`` (see `Configuring workflows <https://molecularai.github.io/maize/docs/userguide.html#config-workflow>`_). This module will then be loaded in the process running the node.
+This will run locally. To configure maize nodes to run through a scheduler such as slurm, see :doc:`configuration`.
 
-* With a separate python environment:
-
-  Some nodes will require custom python environments that are likely to be incompatible with the other environments. In those cases, the node process can be spawned in a custom environment. Note that this environment must still contain *maize*.
-
-* By specifying the executable location and possibly script interpreter. This can also be accomplished using ``config.toml`` (see `Configuring workflows <https://molecularai.github.io/maize/docs/userguide.html#config-workflow>`_).
 
 
 Indices and tables
