@@ -17,10 +17,11 @@ maize-biosimspace
 
 .. toctree::
    :hidden:
-   :maxdepth: 1
-   :caption: Examples
+   :maxdepth: 2
+   :caption: Tutorials
 
-   production-md
+   cli_tutorials
+   python_tutorials
 
 .. toctree::
    :hidden:
