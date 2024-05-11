@@ -83,7 +83,7 @@ class _SystemPreparationBase(Graph, ABC):
     runtime_unrestrained_npt: Parameter[float] = Parameter(default=1.0)
     """The runtime for NPT equilibration without restraints, in ns"""
 
-    save_name: Parameter[Path] = Parameter(default="bss_system")
+    save_name: FileParameter[Path] = FileParameter(default="bss_system")
 
     def build(self) -> None:
         param_lig = self.add(Parameterise, name="ParameteriseLigand")

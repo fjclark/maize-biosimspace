@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 import pytest
 
-from maize.core.interface import Parameter
+from maize.core.interface import FileParameter, Parameter
 from maize.utilities.testing import TestRig
 
 from ._base import _BioSimSpaceBase
@@ -98,7 +98,7 @@ class _EquilibrateBase(_BioSimSpaceBase, ABC):
     angstrom**2.
     """
 
-    save_name: Parameter[Path] = Parameter(optional=True)
+    save_name: FileParameter[Path] = FileParameter(optional=True)
     """
     If supplied, the output files will be saved with
     this name. E.g., if set to Path("output"), the output

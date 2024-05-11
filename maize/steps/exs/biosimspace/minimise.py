@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from maize.core.interface import Parameter
+from maize.core.interface import FileParameter, Parameter
 from maize.core.workflow import expose
 from maize.utilities.testing import TestRig
 
@@ -71,7 +71,7 @@ class _MinimiseBase(_BioSimSpaceBase, ABC):
     kcal_per_mol / angstrom**2. Default = 10.0.
     """
 
-    save_name: Parameter[Path] = Parameter(optional=True)
+    save_name: FileParameter[Path] = FileParameter(optional=True)
     """
     If supplied, the output files will be saved with
     this name. E.g., if set to Path("output"), the output
