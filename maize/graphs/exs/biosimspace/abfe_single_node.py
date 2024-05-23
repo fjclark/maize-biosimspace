@@ -38,6 +38,7 @@ def get_abfe_multi_isomer_workflow() -> Workflow:
         ]
     )
     flow.combine_parameters(abfe_multi_isomer.inp_protein, name="protein_pdb_path")
+    flow.combine_parameters(abfe_multi_isomer.inp_param_protein, name="param_protein_files")
     flow.combine_parameters(load_data.data, name="lig_sdfs_file")
 
     return flow
