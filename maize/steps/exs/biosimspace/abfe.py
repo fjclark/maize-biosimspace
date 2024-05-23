@@ -105,6 +105,12 @@ class BssAbfe(Node):
     inp_protein: Input[Annotated[Path, Suffix("pdb")]] = Input(cached=True)
     """Protein structure to use for the ABFE calculations."""
 
+    inp_cofactor_sdf: Input[Annotated[Path, Suffix("pdb")]] = Input(optional=True)
+    """"
+    Path to the sdf file of the cofactor to use in the ABFE calculations. This
+    will be parameterised in the same way as the ligands.
+    """
+
     out: Output[dict[str, ABFEResult]] = Output()
     """A dictionary of InChI keys to ABFE results."""
 
@@ -259,6 +265,7 @@ class BssAbfe(Node):
             self._recieve_isomers()
             self._create_sdfs()
             self._parameterise()
+            self._set_up_cofactor()
             self._assemble_complexes()
             self._solvate()
             self._minimise()
@@ -396,6 +403,66 @@ class BssAbfe(Node):
 
         # Delete the system to save memory
         del protein_system
+
+    def _set_up_cofactor(self) -> None:
+        """Parameterise the cofactor and add it to the protein."""
+        # This is compute intensive, so write out a BSS script,
+        # run it with run_command, then read back in the output
+        import BioSimSpace as BSS
+
+        if self.inp_cofactor_sdf.is_connected:
+            self.logger.info("Parameterising cofactor...")
+
+            # Create a python script to be run through run_command (so that we use the
+            # desired scheduling system)
+            work_dir = self.work_dir / Path("parameterise_cofactor")
+            work_dir.mkdir(parents=True, exist_ok=True)
+            param_script = (
+                "import BioSimSpace as BSS\n"
+                "from maize.steps.exs.biosimspace._utils import rename_lig\n"
+                f"system = BSS.IO.readMolecules('{self.inp_cofactor_sdf.receive()}')\n"
+                "system = system[0]\n"
+                "param_mol = BSS.Parameters.parameterise(\n"
+                "    system,\n"
+                f"    forcefield='{self.ligand_force_field.value}',\n"
+                f"    work_dir='{work_dir}',\n"
+                ").getMolecule().toSystem()\n"
+                "rename_lig(param_mol, new_name='COF')\n"
+                f'BSS.IO.saveMolecules("{work_dir}/slurm_out", param_mol, ["prm7", "rst7"])\n'
+            )
+
+            # Write the script to a file
+            with open(work_dir / Path("param_script.py"), "w") as f:
+                f.write(param_script)
+
+            # Run the script
+            self.run_command(f"python {work_dir / Path('param_script.py')}")
+
+            # Check that the output has been successfully generated. If so,
+            # load it back in and add it to the parameterised protein system
+            output_paths = [work_dir / Path("slurm_out.prm7"), work_dir / Path("slurm_out.rst7")]
+            if all([path.exists() for path in output_paths]):
+                cofactor_system = BSS.IO.readMolecules([str(path) for path in output_paths])
+                protein_system = BSS.IO.readMolecules(
+                    [str(path) for path in self.bss_systems["bound"]]
+                )
+                protein_system += cofactor_system
+                BSS.IO.saveMolecules(
+                    str(work_dir / Path("protein_cofactor.prm7")), protein_system, ["prm7", "rst7"]
+                )
+                protein_paths = [
+                    str(work_dir / Path("protein_cofactor.prm7")),
+                    str(work_dir / Path("protein_cofactor.rst7")),
+                ]
+
+                for name in self.bss_systems["free"]:
+                    self.bss_systems["bound"][name] = protein_paths
+
+                # Delete the system to save memory
+                del protein_system
+
+            else:
+                self.logger.error(f"Failed to parameterise the cofactor. Please check {work_dir}.")
 
     def _assemble_complexes(self) -> None:
         """Combine the parameterised protein and ligands to create the complexes."""
