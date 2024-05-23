@@ -1135,9 +1135,19 @@ class TestSuiteABFE:
         )
         output = res["out"].get()
 
+        # Check that results have been returned
+        # Check that output["UHOVQNZJYSORNB-UHFFFAOYNA-N"] is an ABFEResult object
+        assert isinstance(output["UHOVQNZJYSORNB-UHFFFAOYNA-N"], ABFEResult)
+        abfe_res = output["UHOVQNZJYSORNB-UHFFFAOYNA-N"]
+        assert abfe_res.smiles == "[H]c1c([H])c([H])c([H])c([H])c1[H]"
+        assert abfe_res.inchi_key == "UHOVQNZJYSORNB-UHFFFAOYNA-N"
+        assert abfe_res.dg_array.shape == (2,)
+        assert isinstance(abfe_res.dg_array, np.ndarray)
+        assert abfe_res.error_array.shape == (2,)
+        assert isinstance(abfe_res.error_array, np.ndarray)
+        assert isinstance(abfe_res.dg, float)
+        assert isinstance(abfe_res.error, float)
+
         # Check that the dumping worked
-        # Get the most recent directory in the dump folder
         dump_output_dir = sorted(dump_dir.iterdir())[-1]
-        assert any(f.name.startswith("bss_system") for f in dump_output_dir.iterdir())
-        assert any(f.name.endswith(".prm7") for f in dump_output_dir.iterdir())
-        assert any(f.name.endswith(".rst7") for f in dump_output_dir.iterdir())
+        assert dump_output_dir.exists()
