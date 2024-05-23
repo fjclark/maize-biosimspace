@@ -1146,7 +1146,7 @@ class TestSuiteABFE:
         assert abfe_res.error_array.shape == (2,)
         assert isinstance(abfe_res.error_array, np.ndarray)
         assert isinstance(abfe_res.dg, float)
-        assert isinstance(abfe_res.error, float)
+        assert isinstance(abfe_res.ci_95, float)
 
         # Check that the dumping worked
         dump_output_dir = sorted(dump_dir.iterdir())[-1]
