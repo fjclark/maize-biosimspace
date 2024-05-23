@@ -419,6 +419,10 @@ class BssAbfe(Node):
 
         self.logger.info("Solvating systems...")
 
+        self.logger.info(
+            f"Solvating system with {self.water_model.value} water and {self.ion_conc.value} M NaCl..."
+        )
+
         # Again, this is light weight, so no need to use run_command
         for leg in self.bss_systems:
             for name, system_paths in self.bss_systems[leg].items():
@@ -462,9 +466,6 @@ class BssAbfe(Node):
                     waters_to_exclude = []
                 system.removeMolecules(waters_to_exclude)
 
-                self.logger.info(
-                    f"Solvating system with {self.water_model.value} water and {self.ion_conc.value} M NaCl..."
-                )
                 solvated_system = BSS.Solvent.solvate(
                     model=self.water_model.value,
                     molecule=system,
