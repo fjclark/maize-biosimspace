@@ -482,76 +482,78 @@ class BssAbfe(Node):
 
     def _solvate(self) -> None:
         """Solvate the systems and add the desired salt concentration."""
-        import BioSimSpace as BSS
 
         self.logger.info("Solvating systems...")
-
-        self.logger.info(
-            f"Solvating system with {self.water_model.value} water and {self.ion_conc.value} M NaCl..."
-        )
-
-        # Again, this is light weight, so no need to use run_command
+        cmds = []
+        output_dirs = {}
         for leg in self.bss_systems:
+            output_dirs[leg] = {}
             for name, system_paths in self.bss_systems[leg].items():
-                output_dir = self.work_dir / Path("solvate") / Path(leg) / Path(name)
-                output_dir.mkdir(parents=True, exist_ok=True)
-                system = BSS.IO.readMolecules([str(path) for path in system_paths])
+                work_dir = self.work_dir / Path("solvate") / Path(leg) / Path(name)
+                work_dir.mkdir(parents=True, exist_ok=True)
+                output_dirs[leg][name] = work_dir
 
-                # Get the "dry" system (we want to ignore any crystallographic water
-                # molecules when working out the padding)
-                non_waters = [mol for mol in system if mol.nAtoms() != 3]
-                dry_system = BSS._SireWrappers._system.System(non_waters)
-                box_min, box_max = dry_system.getAxisAlignedBoundingBox()
-
-                # Work out the box size from the difference in the coordinates
-                box_size = [y - x for x, y in zip(box_min, box_max)]
-
-                # Add requested padding to the box size in each dimension
-                padding = 12 * BSS.Units.Length.angstrom
-
-                # Work out an appropriate box. This box length will used in each dimension
-                # to ensure that the cutoff constraints are satisfied if the molecule rotates
-                box_length = max(box_size) + 2 * padding
-                # box, angles = BSS.Box.rhombicDodecahedronHexagon(box_length)
-                box, angles = BSS.Box.cubic(box_length)
-
-                # Exclude waters if they are too far from the protein. These are unlikely
-                # to be important for the simulation and including them would require a larger
-                # box. Exclude if further than the supplied padding.
-                try:
-                    waters_to_exclude = [
-                        wat
-                        for wat in system.search(
-                            f"water and not (water within {padding} of protein)"
-                        ).molecules()
-                    ]
-                    if len(waters_to_exclude) > 0:
-                        self.logger.info(
-                            f"Excluding {len(waters_to_exclude)} waters that are over {padding} A from the protein"
-                        )
-                except ValueError:
-                    waters_to_exclude = []
-                system.removeMolecules(waters_to_exclude)
-
-                solvated_system = BSS.Solvent.solvate(
-                    model=self.water_model.value,
-                    molecule=system,
-                    box=box,
-                    angles=angles,
-                    ion_conc=self.ion_conc.value,
+                # Create a python script to be run through run_command (so that we use the
+                # desired scheduling system)
+                script = (
+                    "import BioSimSpace as BSS\n"
+                    f"system = BSS.IO.readMolecules({[str(path) for path in system_paths]})\n"
+                    "non_waters = [mol for mol in system if mol.nAtoms() != 3]\n"
+                    "dry_system = BSS._SireWrappers._system.System(non_waters)\n"
+                    "box_min, box_max = dry_system.getAxisAlignedBoundingBox()\n"
+                    "box_size = [y - x for x, y in zip(box_min, box_max)]\n"
+                    "padding = 12 * BSS.Units.Length.angstrom\n"
+                    "box_length = max(box_size) + 2 * padding\n"
+                    "box, angles = BSS.Box.cubic(box_length)\n"
+                    "try:\n"
+                    "    waters_to_exclude = [wat for wat in system.search(f'water and not (water within {padding} of protein)').molecules()]\n"
+                    "    if len(waters_to_exclude) > 0:\n"
+                    "        print(f'Excluding {len(waters_to_exclude)} waters that are over {padding} A from the protein')\n"
+                    "except ValueError:\n"
+                    "    waters_to_exclude = []\n"
+                    "system.removeMolecules(waters_to_exclude)\n"
+                    "solvated_system = BSS.Solvent.solvate(\n"
+                    f"    model='{self.water_model.value}',\n"
+                    "    molecule=system,\n"
+                    "    box=box,\n"
+                    "    angles=angles,\n"
+                    f"    ion_conc={self.ion_conc.value},\n"
+                    ")\n"
+                    f"BSS.IO.saveMolecules('{work_dir / Path('solvated')}', solvated_system, ['prm7', 'rst7'])\n"
                 )
 
-                # Save the output and update the bss_systems dictionary
-                BSS.IO.saveMolecules(
-                    str(output_dir / Path("solvated")), solvated_system, ["prm7", "rst7"]
-                )
-                self.bss_systems[leg][name] = [
-                    output_dir / Path("solvated.prm7"),
-                    output_dir / Path("solvated.rst7"),
+                # Write the script to a file
+                with open(work_dir / Path("solvate_script.py"), "w") as f:
+                    f.write(script)
+
+                cmds.append(f"python {work_dir / Path('solvate_script.py')}")
+
+        # Run for all ligands in parallel
+        self.logger.info("Solvating all systems...")
+        options = JobResourceConfig(custom_attributes={"mem": "24GB"})
+        self.run_multi(cmds, batch_options=options)
+
+        # Collect all the results and update the bss_systems dictionary. If one has failed, log this
+        # and add it to the failed dictionary.
+        for leg, leg_dirs in output_dirs.items():
+            for name, work_dir in leg_dirs.items():
+                # Check if we have the expected output files
+                output_files = [
+                    work_dir / Path("solvated.prm7"),
+                    work_dir / Path("solvated.rst7"),
                 ]
+                if all([path.exists() for path in output_files]):
+                    self.bss_systems[leg][name] = [str(path) for path in output_files]
+                else:
+                    self.failed_isomers[name] = {
+                        "system": self.bss_systems[leg][name],
+                        "reason": f"Failed to solvate {name}.",
+                    }
+                    del self.bss_systems[leg][name]
 
-                # Delete systems
-                del system, solvated_system, dry_system
+        # Check in case all isomers failed and we have nothing left in bss_systems
+        if not any(self.bss_systems.values()):
+            raise ValueError("All isomers failed to solvate.")
 
     def _minimise(self) -> None:
         """Minimise the systems."""
