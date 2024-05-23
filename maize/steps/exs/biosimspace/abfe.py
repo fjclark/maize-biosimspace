@@ -102,8 +102,13 @@ class BssAbfe(Node):
     inp: Input[list[Isomer]] = Input()
     """Molecules to run ABFE calculations on."""
 
-    inp_protein: Input[Annotated[Path, Suffix("pdb")]] = Input(cached=True)
+    inp_protein: Input[Annotated[Path, Suffix("pdb")]] = Input(cached=True, optional=True)
     """Protein structure to use for the ABFE calculations."""
+
+    inp_param_protein: Input[
+        tuple[Annotated[Path, Suffix("prm7")], Annotated[Path, Suffix("rst7")]]
+    ] = Input(cached=True, optional=True)
+    """Parameterised protein structure to use for the ABFE calculations. If supplied, this will be used instead of inp_protein."""
 
     out: Output[dict[str, ABFEResult]] = Output()
     """A dictionary of InChI keys to ABFE results."""
@@ -256,6 +261,7 @@ class BssAbfe(Node):
         self.isomers: list[Isomer] = []
 
         try:
+            self._check_input()
             self._recieve_isomers()
             self._create_sdfs()
             self._parameterise()
@@ -284,6 +290,24 @@ class BssAbfe(Node):
         finally:
             # Make sure to always dump the output
             self._dump_data()
+
+    def _check_input(self) -> None:
+        """Make sure that one, and only one, of inp_protein and inp_param_protein is provided."""
+        inp_protein = self.inp_protein.receive_optional()
+        inp_param_protein = self.inp_param_protein.receive_optional()
+
+        if inp_protein and inp_param_protein:
+            raise ValueError("Both inp_protein and inp_param_protein were provided.")
+
+        if not inp_protein and not inp_param_protein:
+            raise ValueError("Neither inp_protein nor inp_param_protein were provided.")
+
+        self.param_protein = inp_param_protein
+        self.protein_pdb = inp_protein
+
+        # If we have the parameterised protein, just point to this
+        if self.param_protein:
+            self.bss_systems["bound"]["protein"] = [str(path) for path in self.param_protein]
 
     def _recieve_isomers(self) -> None:
         """Receive the isomers from the input."""
@@ -360,42 +384,46 @@ class BssAbfe(Node):
             raise ValueError("All isomers failed to parameterise.")
 
         # Parameterise the protein (and any waters). No need to use run_command as this is cheap.
-        self.logger.info("Parameterising protein...")
-        protein_path = self.inp_protein.receive()
-        prot_param_dir = self.work_dir / Path("parameterise_protein")
-        protein_sys = BSS.IO.readMolecules(str(protein_path))
-        protein_molecules = protein_sys.getMolecules()
-        # Parameterise molecules (protein chains or waters) individually
-        param_mol = []
-        for molecule in protein_molecules:
-            param_mol.append(
-                BSS.Parameters.parameterise(
-                    molecule,
-                    forcefield=self.protein_force_field.value,
-                    water_model=self.water_model.value,
-                    work_dir=str(prot_param_dir),
+        if self.protein_pdb:
+            self.logger.info("Parameterising protein...")
+            protein_path = self.protein_pdb
+            prot_param_dir = self.work_dir / Path("parameterise_protein")
+            protein_sys = BSS.IO.readMolecules(str(protein_path))
+            protein_molecules = protein_sys.getMolecules()
+            # Parameterise molecules (protein chains or waters) individually
+            param_mol = []
+            for molecule in protein_molecules:
+                param_mol.append(
+                    BSS.Parameters.parameterise(
+                        molecule,
+                        forcefield=self.protein_force_field.value,
+                        water_model=self.water_model.value,
+                        work_dir=str(prot_param_dir),
+                    )
+                    .getMolecule()
+                    .toSystem()
                 )
-                .getMolecule()
-                .toSystem()
+            protein_system = param_mol[0]
+            for mol in param_mol[1:]:
+                protein_system += mol
+
+            # Save the protein system and set all the bound systems to point to this path
+            BSS.IO.saveMolecules(
+                str(prot_param_dir / Path("protein.prm7")), protein_system, ["prm7", "rst7"]
             )
-        protein_system = param_mol[0]
-        for mol in param_mol[1:]:
-            protein_system += mol
+            protein_paths = [
+                str(prot_param_dir / Path("protein.prm7")),
+                str(prot_param_dir / Path("protein.rst7")),
+            ]
 
-        # Save the protein system and set all the bound systems to point to this path
-        BSS.IO.saveMolecules(
-            str(prot_param_dir / Path("protein.prm7")), protein_system, ["prm7", "rst7"]
-        )
-        protein_paths = [
-            str(prot_param_dir / Path("protein.prm7")),
-            str(prot_param_dir / Path("protein.rst7")),
-        ]
+            for name in self.bss_systems["free"]:
+                self.bss_systems["bound"][name] = protein_paths
 
-        for name in self.bss_systems["free"]:
-            self.bss_systems["bound"][name] = protein_paths
+            # Delete the system to save memory
+            del protein_system
 
-        # Delete the system to save memory
-        del protein_system
+        else:
+            self.logger.info("Using parameterised protein provided.")
 
     def _assemble_complexes(self) -> None:
         """Combine the parameterised protein and ligands to create the complexes."""
