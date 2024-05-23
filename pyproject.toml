@@ -37,7 +37,7 @@ bss_production_pmemd_cuda = "maize.steps.exs.biosimspace.production:production_p
 bss_production_pmemd = "maize.steps.exs.biosimspace.production:production_pmemd_exposed"
 bss_production_sander = "maize.steps.exs.biosimspace.production:production_sander_exposed"
 bss_production_somd = "maize.steps.exs.biosimspace.production:production_somd_exposed"
-bss_abfe_multi_isomer = "maize.graphs.exs.biosimspace.abfe:abfe_multi_isomer_exposed"
+bss_abfe_multi_isomer = "maize.graphs.exs.biosimspace.abfe_single_node:abfe_multi_isomer_exposed"
 
 [tool.mypy]
 follow_imports = "silent"
