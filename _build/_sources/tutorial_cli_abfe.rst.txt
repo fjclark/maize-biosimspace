@@ -19,24 +19,18 @@ Copy over the required input:
    cp ../tests/data/t4l.pdb .
 
 Now, let's run a relatively very short (but still fairly expensive)
-ABFE calculation with 2 replicates:
+ABFE calculation with 0.01 ns of sampling per production window.
+Note that you currently need to provide the absolute path to your inputs:
 
 .. code-block:: bash
 
-   bss_abfe_multi_isomer --lig_sdfs_file benzene.sdf \
-                         --protein_pdb benzene.t4l \
-                         --ligand_force_field gaff2 \
-                         --protein_force_field ff14SB \
-                         --abfe_timestep 4 \
-                         --abfe_n_replicates 2 \
-                         --abfe_runtime 0.1 \
-                         --abfe_runtime_generate_boresch_restraint 0.1 \
-                         --prep_runtime_restrained_npt 0.05 \
-                         --prep_runtime_unrestrained_npt 0.05 \
-                         --abfe_estimator TI \
-                         --results_file_name abfe_out \
+   bss_abfe_multi_isomer --lig_sdfs_file <INSERT ABSOLUTE PATH TO benzene.sdf> \
+                         --protein_pdb_path <INSERT ABSOLUTE PATH to t4l.pdb> \
+                         --run_time_abfe 0.01 \
+                         --dump_to . \
 
-The ``abfe_out`` file should show results around -4 kcal / mol.
+The results (see the log or ``results.json`` in the ``dump`` directory) should show
+a binding free energy of around -5 kcal/mol.
 
 Running through the command line with this many arguments is unweildy,
 and some options aren't available through the CLI (for example, the lambda
@@ -46,7 +40,7 @@ pre-made workflow directly in python - simply import the workflow factory
 
 .. code-block:: python
    
-   from maize.graphs.exs.biosimspace.afe import getabfe_multi_isomer_workflow
+   from maize.graphs.exs.biosimspace.abfe_single_node import get_abfe_multi_isomer_workflow
    workflow = getabfe_multi_isomer_workflow()
 
    # Set workflow options...
