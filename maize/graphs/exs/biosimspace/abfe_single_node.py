@@ -17,6 +17,7 @@ def get_abfe_multi_isomer_workflow() -> Workflow:
     flow = Workflow(name="absolute_binding_free_energy_multi_isomer", cleanup_temp=False)
 
     load_data = flow.add(LoadData[Path], name="LoadSdfPath")
+    load_data.data.doc = "The path to the SDF file containing the ligands."
 
     # Convert to isomers
     sdf_to_isomers = flow.add(SdfPathtoIsomerList, name="SdfPathtoIsomerList")
