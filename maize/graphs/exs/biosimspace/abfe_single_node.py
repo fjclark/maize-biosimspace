@@ -30,7 +30,16 @@ def get_abfe_multi_isomer_workflow() -> Workflow:
     flow.connect(abfe_multi_isomer.out, void.inp)
 
     # Map the inputs/ parameters
-    exclude_parameters = ["commands", "python", "scripts", "modules", "batch_options"]
+    exclude_parameters = [
+        "commands",
+        "python",
+        "scripts",
+        "modules",
+        "batch_options",
+        "lambda_schedule_bound",
+        "lambda_schedule_free",
+    ]
+
     flow.map(
         *[
             value
