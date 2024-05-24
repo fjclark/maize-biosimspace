@@ -1025,7 +1025,7 @@ class BssAbfe(Node):
             # If it exists, move the old dump directory
             i = 0
             while dump_dir.exists():
-                dump_dir = self.dump_to.value.parent / Path(f"dump_{i}")
+                dump_dir = self.dump_to.value / Path(f"dump_{i}")
                 i += 1
 
             dump_dir.mkdir(parents=True, exist_ok=True)
