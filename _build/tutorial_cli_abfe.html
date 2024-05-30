@@ -239,28 +239,22 @@ cp<span class="w"> </span>../tests/data/t4l.pdb<span class="w"> </span>.
 </pre></div>
 </div>
 <p>Now, let’s run a relatively very short (but still fairly expensive)
-ABFE calculation with 2 replicates:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bss_abfe_multi_isomer<span class="w"> </span>--lig_sdfs_file<span class="w"> </span>benzene.sdf<span class="w"> </span><span class="se">\</span>
-<span class="w">                      </span>--protein_pdb<span class="w"> </span>benzene.t4l<span class="w"> </span><span class="se">\</span>
-<span class="w">                      </span>--ligand_force_field<span class="w"> </span>gaff2<span class="w"> </span><span class="se">\</span>
-<span class="w">                      </span>--protein_force_field<span class="w"> </span>ff14SB<span class="w"> </span><span class="se">\</span>
-<span class="w">                      </span>--abfe_timestep<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
-<span class="w">                      </span>--abfe_n_replicates<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
-<span class="w">                      </span>--abfe_runtime<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span><span class="se">\</span>
-<span class="w">                      </span>--abfe_runtime_generate_boresch_restraint<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span><span class="se">\</span>
-<span class="w">                      </span>--prep_runtime_restrained_npt<span class="w"> </span><span class="m">0</span>.05<span class="w"> </span><span class="se">\</span>
-<span class="w">                      </span>--prep_runtime_unrestrained_npt<span class="w"> </span><span class="m">0</span>.05<span class="w"> </span><span class="se">\</span>
-<span class="w">                      </span>--abfe_estimator<span class="w"> </span>TI<span class="w"> </span><span class="se">\</span>
-<span class="w">                      </span>--results_file_name<span class="w"> </span>abfe_out<span class="w"> </span><span class="se">\</span>
+ABFE calculation with 0.01 ns of sampling per production window.
+Note that you currently need to provide the absolute path to your inputs:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bss_abfe_multi_isomer<span class="w"> </span>--lig_sdfs_file<span class="w"> </span>&lt;INSERT<span class="w"> </span>ABSOLUTE<span class="w"> </span>PATH<span class="w"> </span>TO<span class="w"> </span>benzene.sdf&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">                      </span>--protein_pdb_path<span class="w"> </span>&lt;INSERT<span class="w"> </span>ABSOLUTE<span class="w"> </span>PATH<span class="w"> </span>to<span class="w"> </span>t4l.pdb&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">                      </span>--run_time_abfe<span class="w"> </span><span class="m">0</span>.01<span class="w"> </span><span class="se">\</span>
+<span class="w">                      </span>--dump_to<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
 </pre></div>
 </div>
-<p>The <code class="docutils literal notranslate"><span class="pre">abfe_out</span></code> file should show results around -4 kcal / mol.</p>
+<p>The results (see the log or <code class="docutils literal notranslate"><span class="pre">results.json</span></code> in the <code class="docutils literal notranslate"><span class="pre">dump</span></code> directory) should show
+a binding free energy of around -5 kcal/mol.</p>
 <p>Running through the command line with this many arguments is unweildy,
 and some options aren’t available through the CLI (for example, the lambda
 spacing). It’s likely a better option to write a quick script - using the
 pre-made workflow directly in python - simply import the workflow factory
 , customise the options, and run (all in a python script):</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">maize.graphs.exs.biosimspace.afe</span> <span class="kn">import</span> <span class="n">getabfe_multi_isomer_workflow</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">maize.graphs.exs.biosimspace.abfe_single_node</span> <span class="kn">import</span> <span class="n">get_abfe_multi_isomer_workflow</span>
 <span class="n">workflow</span> <span class="o">=</span> <span class="n">getabfe_multi_isomer_workflow</span><span class="p">()</span>
 
 <span class="c1"># Set workflow options...</span>

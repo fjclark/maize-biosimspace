@@ -17,6 +17,7 @@ CLI_MODULES = [
     # Graphs
     "maize.graphs.exs.biosimspace.system_preparation",
     "maize.graphs.exs.biosimspace.abfe",
+    "maize.graphs.exs.biosimspace.abfe_single_node",
 ]
 
 def get_cli_functions(cli_modules: list[str]) -> dict[str, str]:

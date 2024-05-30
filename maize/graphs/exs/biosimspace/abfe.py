@@ -442,7 +442,7 @@ def get_abfe_multi_isomer_workflow() -> Workflow:
     return flow
 
 
-abfe_multi_isomer_exposed = expose(get_abfe_multi_isomer_workflow)
+# abfe_multi_isomer_workflow_exposed = expose(get_abfe_multi_isomer_workflow)
 
 
 def get_abfe_no_prep_workflow() -> Workflow:
